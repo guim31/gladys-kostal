@@ -1,45 +1,80 @@
 // -----------------------------------------------------------------------------
-// Integration configuration.
-//
-// The configuration is filled in by the user in Gladys, from the `config_schema`
-// declared in `gladys-assistant-integration.json`. The SDK fetches it for you
-// (`gladys.getConfig()`) and notifies you of every change through
-// `gladys.onConfigUpdated()`.
-//
-// This module only provides defaults and normalizes the received object, so the
-// rest of the code never has to deal with `undefined`.
+// Configuration of the integration, as filled in by the user from the
+// manifest `config_schema`. DEFAULT_CONFIG mirrors the manifest defaults
+// (test/manifest.test.js keeps them equal); normalizeConfig() turns whatever
+// the form sends into checked values, so the rest of the code never deals
+// with an empty or malformed field.
 // -----------------------------------------------------------------------------
 
-// Defaults: they MUST stay consistent with the `default` values declared in the
-// `config_schema` of the manifest.
+export const LANGUAGE_OPTIONS = ['fr', 'en', 'de', 'es'];
+// Refresh intervals offered in the form, in seconds: one request each.
+export const POLL_INTERVALS_S = [10, 15, 30, 60];
+
 export const DEFAULT_CONFIG = {
-  latitude: 48.8566, // Paris
-  longitude: 2.3522,
-  unit: 'celsius', // 'celsius' | 'fahrenheit'
-  // Seconds between two reads of the polled sensors. Gladys polls at most once
-  // a minute: slower intervals are applied by skipping polls (see
-  // createPoller in src/devices/index.js).
-  poll_frequency: 300,
-  // Reserved key (NOT in config_schema): because the manifest declares both
-  // 'local' and 'cloud' in its `transports` field, Gladys shows a standard
-  // "Prefer the local connection" toggle and sends the user's choice here.
-  // Read-only for the integration; defaults to true.
-  GLADYS_PREFER_LOCAL: true,
+  host: '',
+  password: '',
+  poll_interval: '15',
+  language: 'fr',
+  battery_full_level: 100,
+  battery_empty_level: 5,
+  allow_settings: false,
 };
 
 /**
- * Merge the user config with the defaults.
- * @param {Record<string, unknown>} raw config returned by the SDK
+ * Turn what the user typed into the base URL of the inverter.
+ * "192.0.2.20", "192.0.2.20:8080", "http://plenticore.local/", "https://..."
+ * are accepted; a path is dropped, and so are credentials typed in the
+ * address (they must not end up in a log line).
+ * @returns {{ baseUrl: string, valid: boolean }} baseUrl '' when empty or invalid
+ */
+export function parseHost(raw) {
+  const text = String(raw ?? '').trim();
+  if (text === '') {
+    return { baseUrl: '', valid: true };
+  }
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(text) ? text : `http://${text}`;
+  let url;
+  try {
+    url = new URL(withScheme);
+  } catch {
+    return { baseUrl: '', valid: false };
+  }
+  if (!['http:', 'https:'].includes(url.protocol) || url.hostname === '') {
+    return { baseUrl: '', valid: false };
+  }
+  return { baseUrl: `${url.protocol}//${url.host}`, valid: true };
+}
+
+function integerIn(value, min, max, fallback) {
+  const n = Number(value);
+  return Number.isInteger(n) && n >= min && n <= max ? n : fallback;
+}
+
+/**
+ * @param {Record<string, unknown>} [raw] the config from the SDK
  */
 export function normalizeConfig(raw = {}) {
+  const { baseUrl, valid } = parseHost(raw.host ?? DEFAULT_CONFIG.host);
+  const interval = Number(raw.poll_interval ?? DEFAULT_CONFIG.poll_interval);
+  const full = integerIn(raw.battery_full_level, 50, 100, DEFAULT_CONFIG.battery_full_level);
+  const empty = integerIn(raw.battery_empty_level, 0, 50, DEFAULT_CONFIG.battery_empty_level);
   return {
-    ...DEFAULT_CONFIG,
-    ...raw,
-    // Force the types: config may arrive as strings from a form.
-    latitude: Number(raw.latitude ?? DEFAULT_CONFIG.latitude),
-    longitude: Number(raw.longitude ?? DEFAULT_CONFIG.longitude),
-    poll_frequency: Number(raw.poll_frequency ?? DEFAULT_CONFIG.poll_frequency),
-    // The preference is a boolean; anything but an explicit false means true.
-    GLADYS_PREFER_LOCAL: raw.GLADYS_PREFER_LOCAL !== false,
+    baseUrl,
+    hostValid: valid,
+    password: typeof raw.password === 'string' ? raw.password : '',
+    pollIntervalMs:
+      (POLL_INTERVALS_S.includes(interval) ? interval : Number(DEFAULT_CONFIG.poll_interval)) *
+      1000,
+    language: LANGUAGE_OPTIONS.includes(raw.language) ? raw.language : DEFAULT_CONFIG.language,
+    batteryFullLevel: full,
+    // An "empty" level at or above the "full" one would fire both: keep a gap.
+    batteryEmptyLevel: Math.min(empty, full - 10),
+    // The form sends a boolean; an older core may send the text.
+    allowSettings: raw.allow_settings === true || raw.allow_settings === 'true',
   };
+}
+
+/** The inverter can be reached once an address and a password are set. */
+export function isConfigured(config) {
+  return config.baseUrl !== '' && config.password !== '';
 }

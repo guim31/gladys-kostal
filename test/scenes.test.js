@@ -1,93 +1,146 @@
+// -----------------------------------------------------------------------------
+// The two scene actions on the battery settings: off by default, refused
+// before any request when not allowed or not writable, written as the
+// inverter expects, read back and logged once.
+// -----------------------------------------------------------------------------
+
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import { createFakeGladys } from '@gladysassistant/integration-sdk/testing';
-import { DEVICE_BLUEPRINTS } from '../src/devices/index.js';
-import { MOTION_DETECTED_TRIGGER, motionSensor } from '../src/devices/motionSensor.js';
-import { SCENE_ACTIONS } from '../src/scenes.js';
-import { normalizeConfig } from '../src/config.js';
+import { createWorld } from './helpers/world.js';
 
-const manifest = JSON.parse(
-  await readFile(new URL('../gladys-assistant-integration.json', import.meta.url), 'utf8'),
-);
-const config = normalizeConfig();
+const MIN_SOC = 'set_battery_min_soc';
+const SMART = 'set_smart_battery_control';
 
-const declarationOf = (list, key) => manifest[list].find((entry) => entry.key === key);
-const keysOf = (list) => (list ?? []).map((entry) => entry.key);
-const deviceIdOf = (gladys, key) =>
-  DEVICE_BLUEPRINTS.find((bp) => bp.key === key).deviceExternalId(gladys);
-
-// Let the async interval callback run to completion.
-const flush = () => new Promise((resolve) => setImmediate(resolve));
-
-test('the motion sensor fires one motion_detected event per detection, none on the clear', async (t) => {
-  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout'] });
-  const gladys = createFakeGladys();
-  const stopPush = motionSensor.startPush(gladys, config);
-  try {
-    t.mock.timers.tick(60_000);
-    await flush();
-    assert.equal(gladys.fake.sceneEvents.length, 1, 'one detection, one event');
-    assert.equal(gladys.fake.sceneEvents[0].key, MOTION_DETECTED_TRIGGER);
-    assert.equal(gladys.fake.states.at(-1).state, 1, 'the state is still published');
-
-    t.mock.timers.tick(10_000);
-    await flush();
-    assert.equal(gladys.fake.states.at(-1).state, 0, 'the detection is cleared');
-    assert.equal(gladys.fake.sceneEvents.length, 1, 'the clear fires no event');
-  } finally {
-    stopPush();
-  }
-});
-
-test('motion_detected data only carries keys the trigger declares', async (t) => {
-  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout'] });
-  const gladys = createFakeGladys();
-  const stopPush = motionSensor.startPush(gladys, config);
-  try {
-    t.mock.timers.tick(60_000);
-    await flush();
-  } finally {
-    stopPush();
-  }
-  const [{ data }] = gladys.fake.sceneEvents;
-  const trigger = declarationOf('scene_triggers', MOTION_DETECTED_TRIGGER);
-  // The core keeps the `fields` keys (filters) and the `variables` keys
-  // (exposed to the scene): any other key would be silently dropped.
-  const declared = [...keysOf(trigger.fields), ...keysOf(trigger.variables)];
-  for (const [key, value] of Object.entries(data)) {
-    assert.ok(declared.includes(key), `data.${key} is not declared, the core would drop it`);
-    assert.ok(value === null || typeof value !== 'object', `data.${key} must be a primitive`);
-  }
-  // A `"source": "devices"` filter stores a device external_id.
-  assert.equal(data.device, deviceIdOf(gladys, 'motion-sensor'));
-  const targets = trigger.fields.find((field) => field.key === 'target').options;
-  assert.ok(
-    targets.some((option) => option.value === data.target),
-    `data.target "${data.target}" must be one of the filter options`,
+test('off by default: refused, nothing written, the error says how to enable it', async () => {
+  const world = await createWorld();
+  const result = await world.gladys.fake.sceneAction(MIN_SOC, { level: 30 });
+  assert.equal(result.success, false);
+  assert.match(result.error, /activez-les dans la configuration Kostal/);
+  assert.deepEqual(world.kostal.writes, []);
+  assert.equal(world.kostal.count('settings', 'POST') > 0, true, 'the identity only');
+  assert.equal(
+    world.kostal.requests.filter((r) => r.method === 'PUT').length,
+    0,
+    'no write request at all',
   );
+  await world.app.stop();
 });
 
-test('identify_device signals the chosen device and returns the declared outputs', async () => {
-  const gladys = createFakeGladys();
-  const outputs = await SCENE_ACTIONS.identify_device(gladys, {
-    fields: { device: deviceIdOf(gladys, 'light') },
-    config,
-  });
-  assert.deepEqual(outputs, { signalled: true });
-  const declared = keysOf(declarationOf('scene_actions', 'identify_device').outputs);
-  for (const key of Object.keys(outputs)) {
-    assert.ok(declared.includes(key), `output "${key}" is not declared, the core would drop it`);
+test('allowed: the reserve is written in steps of 5 %, read back, logged once', async () => {
+  const world = await createWorld({ config: { allow_settings: true, language: 'en' } });
+  const result = await world.gladys.fake.sceneAction(MIN_SOC, { level: 32 });
+  assert.deepEqual(result, { success: true, data: { outputs: { min_soc: 30 } } });
+  assert.deepEqual(world.kostal.writes, [
+    { moduleid: 'devices:local', id: 'Battery:MinSoc', value: '30' },
+  ]);
+  assert.equal(world.app.service.batterySettings.minSoc, 30, 'read back');
+  assert.deepEqual(
+    world.logs
+      .at('info')
+      .map((line) => line.text)
+      .slice(1),
+    ['Scene action: minimum state of charge set to 30 %'],
+  );
+  await world.app.stop();
+});
+
+test('out of the range the inverter gives: refused before any request', async () => {
+  const world = await createWorld({ config: { allow_settings: true, language: 'de' } });
+  for (const level of [0, 2, 101, 'abc']) {
+    const result = await world.gladys.fake.sceneAction(MIN_SOC, { level });
+    assert.equal(result.success, false, `level ${level}`);
+    assert.match(result.error, /zwischen 5 und 100 %/);
   }
+  assert.deepEqual(world.kostal.writes, []);
+  await world.app.stop();
 });
 
-test('identify_device reports a device that cannot signal itself through its output', async () => {
-  // Not a failure: a scene action is never a condition, the scene author
-  // gates the following actions on the output instead.
-  const gladys = createFakeGladys();
-  const outputs = await SCENE_ACTIONS.identify_device(gladys, {
-    fields: { device: deviceIdOf(gladys, 'weather-station') },
-    config,
+test('smart battery control on turns the time control off first, as the inverter expects', async () => {
+  const world = await createWorld({ config: { allow_settings: true } });
+  assert.deepEqual(await world.gladys.fake.sceneAction(SMART, { enabled: 'on' }), {
+    success: true,
+    data: { outputs: { enabled: true } },
   });
-  assert.deepEqual(outputs, { signalled: false });
+  assert.deepEqual(world.kostal.writes, [
+    { moduleid: 'devices:local', id: 'Battery:TimeControl:Enable', value: '0' },
+    { moduleid: 'devices:local', id: 'Battery:SmartBatteryControl:Enable', value: '1' },
+  ]);
+  assert.equal(world.app.service.batterySettings.smartControl, true);
+  await world.gladys.fake.sceneAction(SMART, { enabled: 'off' });
+  assert.deepEqual(world.kostal.writes.at(-1), {
+    moduleid: 'devices:local',
+    id: 'Battery:SmartBatteryControl:Enable',
+    value: '0',
+  });
+  assert.equal(world.kostal.writes.length, 3, 'turning it off touches nothing else');
+  await world.app.stop();
+});
+
+test('a setting read-only for the plant owner is refused without a request', async () => {
+  const world = await createWorld({
+    config: { allow_settings: true, language: 'es' },
+    before: (kostal) => {
+      kostal.state.settings[0].settings.find((s) => s.id === 'Battery:MinSoc').access = 'readonly';
+    },
+  });
+  const result = await world.gladys.fake.sceneAction(MIN_SOC, { level: 20 });
+  assert.equal(result.success, false);
+  assert.match(result.error, /no permite al propietario/);
+  assert.deepEqual(world.kostal.writes, []);
+  await world.app.stop();
+});
+
+test('the inverter refusing the write: the scene logs say why', async () => {
+  const world = await createWorld({ config: { allow_settings: true, language: 'en' } });
+  // Listed as writable, refused on the write (a firmware that changed its mind).
+  world.kostal.state.settings[0].settings.find((s) => s.id === 'Battery:MinSoc').access =
+    'readonly';
+  const result = await world.gladys.fake.sceneAction(MIN_SOC, { level: 20 });
+  assert.equal(result.success, false);
+  assert.match(result.error, /refused the setting \(settings: HTTP 403 permission denied\)/);
+  assert.equal(world.gladys.fake.connectionStatus.connected, true, 'not a login problem');
+  await world.app.stop();
+});
+
+test('an inverter without battery has no setting to change', async () => {
+  const world = await createWorld({ system: 'plenticore_pv', config: { allow_settings: true } });
+  const result = await world.gladys.fake.sceneAction(SMART, { enabled: 'on' });
+  assert.equal(result.success, false);
+  assert.deepEqual(world.kostal.writes, []);
+  await world.app.stop();
+});
+
+test('the inverter unreachable: refused, nothing queued', async () => {
+  const world = await createWorld({ config: { allow_settings: true, language: 'en' } });
+  world.kostal.goDown();
+  world.clock.advance(15000);
+  await world.app.cycle();
+  const result = await world.gladys.fake.sceneAction(MIN_SOC, { level: 20 });
+  assert.equal(result.success, false);
+  assert.match(result.error, /not connected/);
+  await world.app.stop();
+});
+
+test('the settings are read only when allowed, every 5 minutes', async () => {
+  const off = await createWorld();
+  assert.equal(off.app.service.batterySettings, null);
+  await off.app.stop();
+
+  const world = await createWorld({ config: { allow_settings: true } });
+  assert.deepEqual(
+    {
+      minSoc: world.app.service.batterySettings.minSoc,
+      smart: world.app.service.batterySettings.smartControl,
+    },
+    { minSoc: 5, smart: false },
+  );
+  const reads = () => world.kostal.count('settings', 'POST');
+  const before = reads();
+  world.clock.advance(60000);
+  await world.app.cycle();
+  assert.equal(reads(), before);
+  world.clock.advance(5 * 60000);
+  await world.app.cycle();
+  assert.equal(reads(), before + 1);
+  await world.app.stop();
 });

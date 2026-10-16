@@ -1,177 +1,563 @@
 {
   "manifest_version": 1,
   "type": "device",
-  "name": "Demo Devices Template",
+  "name": "Kostal Plenticore",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "Kostal Plenticore and PIKO IQ inverters on the local network: solar, house, grid and battery.",
+    "fr": "Onduleurs Kostal Plenticore et PIKO IQ en local : production, maison, réseau et batterie.",
+    "de": "Kostal-Plenticore- und PIKO-IQ-Wechselrichter lokal: Solar, Haus, Netz und Batterie.",
+    "es": "Inversores Kostal Plenticore y PIKO IQ en red local: producción, casa, red y batería."
   },
   "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
+  "docker_image": "ghcr.io/guim31/gladys-kostal:1.0.0",
   "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "cover_image": "https://raw.githubusercontent.com/guim31/gladys-kostal/main/cover.png",
+  "categories": ["energy"],
+  "transports": ["local"],
   "config_schema": [
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
-      "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+      "label": {
+        "en": "Connect your Kostal inverter",
+        "fr": "Connecter votre onduleur Kostal",
+        "de": "Deinen Kostal-Wechselrichter verbinden",
+        "es": "Conectar su inversor Kostal"
       },
-      "links": [
+      "description": {
+        "en": "Enter the IP address of the inverter (shown in your router or on the inverter display) and the plant owner password you use to log in to its web interface. Gladys reads the inverter on your local network, without the Kostal cloud. Then open the Discovery tab.",
+        "fr": "Saisissez l'adresse IP de l'onduleur (visible dans votre box ou sur l'écran de l'onduleur) et le mot de passe propriétaire qui ouvre son interface web. Gladys lit l'onduleur sur votre réseau local, sans le cloud Kostal. Ouvrez ensuite l'onglet Découverte.",
+        "de": "Gib die IP-Adresse des Wechselrichters ein (in deinem Router oder auf dem Display des Wechselrichters zu sehen) und das Anlagenbetreiber-Passwort, mit dem du dich an seiner Weboberfläche anmeldest. Gladys liest den Wechselrichter im lokalen Netz, ohne die Kostal-Cloud. Öffne dann den Tab „Entdecken“.",
+        "es": "Introduzca la dirección IP del inversor (visible en su router o en la pantalla del inversor) y la contraseña de propietario con la que entra en su interfaz web. Gladys lee el inversor en su red local, sin la nube de Kostal. Después abra la pestaña Descubrir."
+      }
+    },
+    {
+      "key": "host",
+      "type": "string",
+      "label": {
+        "en": "IP address",
+        "fr": "Adresse IP",
+        "de": "IP-Adresse",
+        "es": "Dirección IP"
+      },
+      "description": {
+        "en": "Of the inverter. A host name works too.",
+        "fr": "De l'onduleur. Un nom d'hôte convient aussi.",
+        "de": "Des Wechselrichters. Ein Hostname geht auch.",
+        "es": "Del inversor. También sirve un nombre de host."
+      },
+      "placeholder": {
+        "en": "e.g. 192.0.2.20",
+        "fr": "ex. 192.0.2.20",
+        "de": "z. B. 192.0.2.20",
+        "es": "p. ej. 192.0.2.20"
+      },
+      "required": true
+    },
+    {
+      "key": "password",
+      "type": "secret",
+      "label": {
+        "en": "Plant owner password",
+        "fr": "Mot de passe propriétaire",
+        "de": "Anlagenbetreiber-Passwort",
+        "es": "Contraseña de propietario"
+      },
+      "description": {
+        "en": "The password of the plant owner account of the inverter's web interface. The installer service code is not needed.",
+        "fr": "Le mot de passe du compte propriétaire (« Anlagenbetreiber ») de l'interface web de l'onduleur. Le code de service de l'installateur n'est pas nécessaire.",
+        "de": "Das Passwort des Anlagenbetreiber-Kontos der Weboberfläche des Wechselrichters. Der Servicecode des Installateurs wird nicht benötigt.",
+        "es": "La contraseña de la cuenta de propietario de la interfaz web del inversor. No hace falta el código de servicio del instalador."
+      },
+      "required": true
+    },
+    {
+      "key": "poll_interval",
+      "type": "select",
+      "label": {
+        "en": "Refresh interval",
+        "fr": "Intervalle de rafraîchissement",
+        "de": "Aktualisierungsintervall",
+        "es": "Intervalo de actualización"
+      },
+      "description": {
+        "en": "How often the inverter is read: one request each time.",
+        "fr": "Fréquence de lecture de l'onduleur : une requête à chaque fois.",
+        "de": "Wie oft der Wechselrichter gelesen wird: jeweils eine Anfrage.",
+        "es": "Frecuencia de lectura del inversor: una petición cada vez."
+      },
+      "required": false,
+      "default": "15",
+      "options": [
         {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
+          "value": "10",
+          "label": {
+            "en": "10 seconds",
+            "fr": "10 secondes",
+            "de": "10 Sekunden",
+            "es": "10 segundos"
+          }
+        },
+        {
+          "value": "15",
+          "label": {
+            "en": "15 seconds",
+            "fr": "15 secondes",
+            "de": "15 Sekunden",
+            "es": "15 segundos"
+          }
+        },
+        {
+          "value": "30",
+          "label": {
+            "en": "30 seconds",
+            "fr": "30 secondes",
+            "de": "30 Sekunden",
+            "es": "30 segundos"
+          }
+        },
+        {
+          "value": "60",
+          "label": {
+            "en": "60 seconds",
+            "fr": "60 secondes",
+            "de": "60 Sekunden",
+            "es": "60 segundos"
+          }
         }
       ]
     },
     {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
-      "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
-      "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
-    },
-    {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
-      "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
-      "required": true,
-      "default": 2.3522,
-      "min": -180,
-      "max": 180
-    },
-    {
-      "key": "unit",
+      "key": "language",
       "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
+      "label": {
+        "en": "Language of the device texts",
+        "fr": "Langue des textes des appareils",
+        "de": "Sprache der Gerätetexte",
+        "es": "Idioma de los textos de los dispositivos"
+      },
+      "description": {
+        "en": "Names given to the new device and its features, the inverter state and the alarm texts.",
+        "fr": "Noms donnés au nouvel appareil et à ses fonctionnalités, textes d'état de l'onduleur et des alarmes.",
+        "de": "Namen des neuen Geräts und seiner Funktionen, Statustexte des Wechselrichters und der Alarme.",
+        "es": "Nombres del nuevo dispositivo y de sus funciones, textos de estado del inversor y de las alarmas."
+      },
       "required": false,
-      "default": "celsius",
+      "default": "fr",
       "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
+        {
+          "value": "fr",
+          "label": {
+            "en": "French",
+            "fr": "Français",
+            "de": "Französisch",
+            "es": "Francés"
+          }
+        },
+        {
+          "value": "en",
+          "label": {
+            "en": "English",
+            "fr": "Anglais",
+            "de": "Englisch",
+            "es": "Inglés"
+          }
+        },
+        {
+          "value": "de",
+          "label": {
+            "en": "German",
+            "fr": "Allemand",
+            "de": "Deutsch",
+            "es": "Alemán"
+          }
+        },
+        {
+          "value": "es",
+          "label": {
+            "en": "Spanish",
+            "fr": "Espagnol",
+            "de": "Spanisch",
+            "es": "Español"
+          }
+        }
       ]
     },
     {
-      "key": "poll_frequency",
+      "key": "battery_full_level",
       "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
+      "label": {
+        "en": "Battery full at (%)",
+        "fr": "Batterie pleine à (%)",
+        "de": "Batterie voll ab (%)",
+        "es": "Batería llena a partir de (%)"
+      },
       "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
+        "en": "Charge level that fires the \"Battery full\" scene trigger.",
+        "fr": "Niveau de charge qui déclenche le déclencheur de scène « Batterie pleine ».",
+        "de": "Ladestand, der den Szenen-Auslöser „Batterie voll“ auslöst.",
+        "es": "Nivel de carga que activa el desencadenante de escena «Batería llena»."
       },
       "required": false,
-      "default": 300,
-      "min": 60,
-      "max": 3600
+      "default": 100,
+      "min": 50,
+      "max": 100
+    },
+    {
+      "key": "battery_empty_level",
+      "type": "number",
+      "label": {
+        "en": "Battery empty at (%)",
+        "fr": "Batterie vide à (%)",
+        "de": "Batterie leer ab (%)",
+        "es": "Batería vacía a partir de (%)"
+      },
+      "description": {
+        "en": "Charge level that fires the \"Battery empty\" scene trigger: usually the minimum state of charge set on the inverter.",
+        "fr": "Niveau de charge qui déclenche le déclencheur de scène « Batterie vide » : en général, le seuil de décharge minimal réglé sur l'onduleur.",
+        "de": "Ladestand, der den Szenen-Auslöser „Batterie leer“ auslöst: meist der am Wechselrichter eingestellte minimale Ladestand.",
+        "es": "Nivel de carga que activa el desencadenante de escena «Batería vacía»: normalmente, el estado de carga mínimo configurado en el inversor."
+      },
+      "required": false,
+      "default": 5,
+      "min": 0,
+      "max": 50
+    },
+    {
+      "key": "settings_intro",
+      "type": "section",
+      "label": {
+        "en": "Battery settings (advanced)",
+        "fr": "Réglages de la batterie (avancé)",
+        "de": "Batterieeinstellungen (erweitert)",
+        "es": "Ajustes de la batería (avanzado)"
+      },
+      "description": {
+        "en": "Off by default. When allowed, two scene actions can change the minimum state of charge and switch the smart battery control, if the inverter lets the plant owner do it. A wrong value changes how your battery is used: check it in the inverter's web interface afterwards.",
+        "fr": "Désactivés par défaut. Une fois autorisés, deux actions de scène peuvent modifier le seuil de décharge minimal et activer ou couper la gestion intelligente de la batterie, si l'onduleur le permet au propriétaire. Une valeur erronée change l'usage de votre batterie : vérifiez-la ensuite dans l'interface web de l'onduleur.",
+        "de": "Standardmäßig aus. Wenn erlaubt, können zwei Szenen-Aktionen den minimalen Ladestand ändern und die intelligente Batteriesteuerung schalten, sofern der Wechselrichter es dem Anlagenbetreiber erlaubt. Ein falscher Wert ändert die Nutzung deiner Batterie: Prüfe ihn danach in der Weboberfläche des Wechselrichters.",
+        "es": "Desactivados por defecto. Una vez permitidos, dos acciones de escena pueden cambiar el estado de carga mínimo y activar o desactivar el control inteligente de la batería, si el inversor lo permite al propietario. Un valor erróneo cambia el uso de su batería: compruébelo después en la interfaz web del inversor."
+      }
+    },
+    {
+      "key": "allow_settings",
+      "type": "boolean",
+      "label": {
+        "en": "Allow battery settings",
+        "fr": "Autoriser les réglages de la batterie",
+        "de": "Batterieeinstellungen erlauben",
+        "es": "Permitir los ajustes de la batería"
+      },
+      "description": {
+        "en": "Lets the scene actions write to the inverter.",
+        "fr": "Permet aux actions de scène d'écrire sur l'onduleur.",
+        "de": "Erlaubt den Szenen-Aktionen, auf den Wechselrichter zu schreiben.",
+        "es": "Permite que las acciones de escena escriban en el inversor."
+      },
+      "required": false,
+      "default": false
     }
   ],
   "actions": [
     {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
-      "timeout_seconds": 30
-    },
-    {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ]
+      "key": "test_connection",
+      "label": {
+        "en": "Test the connection",
+        "fr": "Tester la connexion",
+        "de": "Verbindung testen",
+        "es": "Probar conexión"
+      },
+      "description": {
+        "en": "Logs in to the inverter and says what it found: model, strings, battery, settings.",
+        "fr": "Se connecte à l'onduleur et indique ce qu'il a trouvé : modèle, chaînes, batterie, réglages.",
+        "de": "Meldet sich am Wechselrichter an und zeigt, was gefunden wurde: Modell, Strings, Batterie, Einstellungen.",
+        "es": "Inicia sesión en el inversor e indica lo que ha encontrado: modelo, cadenas, batería, ajustes."
+      },
+      "timeout_seconds": 60
     }
   ],
   "scene_triggers": [
     {
-      "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
+      "key": "inverter_alarm",
+      "label": {
+        "en": "Kostal inverter alarm",
+        "fr": "Alarme de l'onduleur Kostal",
+        "de": "Alarm des Kostal-Wechselrichters",
+        "es": "Alarma del inversor Kostal"
+      },
       "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
+        "en": "A new alarm appeared on the inverter. Its code and its text can be used in the scene.",
+        "fr": "Une nouvelle alarme est apparue sur l'onduleur. Son code et son texte sont utilisables dans la scène.",
+        "de": "Ein neuer Alarm ist am Wechselrichter aufgetreten. Sein Code und sein Text sind in der Szene verfügbar.",
+        "es": "Ha aparecido una nueva alarma en el inversor. Su código y su texto se pueden usar en la escena."
       },
       "fields": [
         {
           "key": "device",
           "type": "select",
           "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
-        },
-        {
-          "key": "target",
-          "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
-          "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
-          ]
+          "label": {
+            "en": "Inverter",
+            "fr": "Onduleur",
+            "de": "Wechselrichter",
+            "es": "Inversor"
+          },
+          "description": {
+            "en": "Leave empty for any inverter.",
+            "fr": "Laisser vide pour n'importe quel onduleur.",
+            "de": "Leer lassen für einen beliebigen Wechselrichter.",
+            "es": "Déjelo vacío para cualquier inversor."
+          }
         }
       ],
       "variables": [
         {
-          "key": "target",
+          "key": "code",
+          "type": "number",
+          "label": {
+            "en": "Alarm code",
+            "fr": "Code de l'alarme",
+            "de": "Alarmcode",
+            "es": "Código de la alarma"
+          }
+        },
+        {
+          "key": "description",
           "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
+          "label": {
+            "en": "Alarm text",
+            "fr": "Texte de l'alarme",
+            "de": "Alarmtext",
+            "es": "Texto de la alarma"
+          }
+        },
+        {
+          "key": "category",
+          "type": "string",
+          "label": {
+            "en": "Category",
+            "fr": "Catégorie",
+            "de": "Kategorie",
+            "es": "Categoría"
+          }
+        }
+      ]
+    },
+    {
+      "key": "battery_full",
+      "label": {
+        "en": "Kostal battery full",
+        "fr": "Batterie Kostal pleine",
+        "de": "Kostal-Batterie voll",
+        "es": "Batería Kostal llena"
+      },
+      "description": {
+        "en": "The charge level reached the \"full\" level of the configuration. Fires again only after dropping 5 points.",
+        "fr": "Le niveau de charge a atteint le seuil « pleine » de la configuration. Ne se redéclenche qu'après une baisse de 5 points.",
+        "de": "Der Ladestand hat die Schwelle „voll“ der Konfiguration erreicht. Löst erst nach einem Rückgang um 5 Punkte erneut aus.",
+        "es": "El nivel de carga ha alcanzado el umbral «llena» de la configuración. Solo se vuelve a activar tras bajar 5 puntos."
+      },
+      "fields": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Inverter",
+            "fr": "Onduleur",
+            "de": "Wechselrichter",
+            "es": "Inversor"
+          },
+          "description": {
+            "en": "Leave empty for any inverter.",
+            "fr": "Laisser vide pour n'importe quel onduleur.",
+            "de": "Leer lassen für einen beliebigen Wechselrichter.",
+            "es": "Déjelo vacío para cualquier inversor."
+          }
+        }
+      ],
+      "variables": [
+        {
+          "key": "level",
+          "type": "number",
+          "label": {
+            "en": "Charge level (%)",
+            "fr": "Niveau de charge (%)",
+            "de": "Ladestand (%)",
+            "es": "Nivel de carga (%)"
+          }
+        }
+      ]
+    },
+    {
+      "key": "battery_empty",
+      "label": {
+        "en": "Kostal battery empty",
+        "fr": "Batterie Kostal vide",
+        "de": "Kostal-Batterie leer",
+        "es": "Batería Kostal vacía"
+      },
+      "description": {
+        "en": "The charge level fell to the \"empty\" level of the configuration. Fires again only after rising 5 points.",
+        "fr": "Le niveau de charge est descendu au seuil « vide » de la configuration. Ne se redéclenche qu'après une hausse de 5 points.",
+        "de": "Der Ladestand ist auf die Schwelle „leer“ der Konfiguration gefallen. Löst erst nach einem Anstieg um 5 Punkte erneut aus.",
+        "es": "El nivel de carga ha bajado al umbral «vacía» de la configuración. Solo se vuelve a activar tras subir 5 puntos."
+      },
+      "fields": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Inverter",
+            "fr": "Onduleur",
+            "de": "Wechselrichter",
+            "es": "Inversor"
+          },
+          "description": {
+            "en": "Leave empty for any inverter.",
+            "fr": "Laisser vide pour n'importe quel onduleur.",
+            "de": "Leer lassen für einen beliebigen Wechselrichter.",
+            "es": "Déjelo vacío para cualquier inversor."
+          }
+        }
+      ],
+      "variables": [
+        {
+          "key": "level",
+          "type": "number",
+          "label": {
+            "en": "Charge level (%)",
+            "fr": "Niveau de charge (%)",
+            "de": "Ladestand (%)",
+            "es": "Nivel de carga (%)"
+          }
         }
       ]
     }
   ],
   "scene_actions": [
     {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
+      "key": "set_battery_min_soc",
+      "label": {
+        "en": "Set the Kostal battery reserve",
+        "fr": "Régler la réserve de la batterie Kostal",
+        "de": "Reserve der Kostal-Batterie einstellen",
+        "es": "Ajustar la reserva de la batería Kostal"
       },
-      "timeout_seconds": 15,
+      "description": {
+        "en": "Changes the minimum state of charge the battery keeps (steps of 5 %). Needs the battery settings allowed in the configuration.",
+        "fr": "Modifie le seuil de décharge minimal de la batterie (par pas de 5 %). Nécessite d'autoriser les réglages de la batterie dans la configuration.",
+        "de": "Ändert den minimalen Ladestand, den die Batterie hält (in 5-%-Schritten). Erfordert erlaubte Batterieeinstellungen in der Konfiguration.",
+        "es": "Cambia el estado de carga mínimo que conserva la batería (en pasos del 5 %). Requiere permitir los ajustes de la batería en la configuración."
+      },
+      "timeout_seconds": 30,
       "fields": [
         {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
+          "key": "level",
+          "type": "number",
+          "label": {
+            "en": "Minimum state of charge (%)",
+            "fr": "Seuil de décharge minimal (%)",
+            "de": "Minimaler Ladestand (%)",
+            "es": "Estado de carga mínimo (%)"
+          },
+          "required": true,
+          "min": 5,
+          "max": 100
         }
       ],
       "outputs": [
         {
-          "key": "signalled",
+          "key": "min_soc",
+          "type": "number",
+          "label": {
+            "en": "Reserve applied (%)",
+            "fr": "Réserve appliquée (%)",
+            "de": "Angewendete Reserve (%)",
+            "es": "Reserva aplicada (%)"
+          }
+        }
+      ]
+    },
+    {
+      "key": "set_smart_battery_control",
+      "label": {
+        "en": "Kostal smart battery control",
+        "fr": "Gestion intelligente de la batterie Kostal",
+        "de": "Intelligente Batteriesteuerung von Kostal",
+        "es": "Control inteligente de la batería Kostal"
+      },
+      "description": {
+        "en": "Switches Kostal's smart battery control on or off (on turns the time control off). Needs the battery settings allowed in the configuration.",
+        "fr": "Active ou coupe la gestion intelligente de la batterie Kostal (l'activer coupe la commande horaire). Nécessite d'autoriser les réglages de la batterie dans la configuration.",
+        "de": "Schaltet die intelligente Batteriesteuerung von Kostal ein oder aus (Einschalten beendet die Zeitsteuerung). Erfordert erlaubte Batterieeinstellungen in der Konfiguration.",
+        "es": "Activa o desactiva el control inteligente de la batería Kostal (activarlo desactiva el control horario). Requiere permitir los ajustes de la batería en la configuración."
+      },
+      "timeout_seconds": 30,
+      "fields": [
+        {
+          "key": "enabled",
+          "type": "select",
+          "label": {
+            "en": "Smart battery control",
+            "fr": "Gestion intelligente",
+            "de": "Intelligente Steuerung",
+            "es": "Control inteligente"
+          },
+          "required": true,
+          "options": [
+            {
+              "value": "on",
+              "label": {
+                "en": "On",
+                "fr": "Activée",
+                "de": "An",
+                "es": "Activado"
+              }
+            },
+            {
+              "value": "off",
+              "label": {
+                "en": "Off",
+                "fr": "Désactivée",
+                "de": "Aus",
+                "es": "Desactivado"
+              }
+            }
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "key": "enabled",
           "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
+          "label": {
+            "en": "Smart control on",
+            "fr": "Gestion intelligente activée",
+            "de": "Intelligente Steuerung an",
+            "es": "Control inteligente activado"
+          }
         }
       ]
     }
   ],
   "widgets": [
     {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
+      "key": "energy_flow",
+      "label": {
+        "en": "Kostal",
+        "fr": "Kostal",
+        "de": "Kostal",
+        "es": "Kostal"
       },
-      "icon": "activity",
-      "action_timeout_seconds": 15
+      "description": {
+        "en": "Solar production, house, grid and battery, today's production and inverter state.",
+        "fr": "Production solaire, maison, réseau et batterie, production du jour et état de l'onduleur.",
+        "de": "Solarproduktion, Haus, Netz und Batterie, Produktion heute und Wechselrichterstatus.",
+        "es": "Producción solar, casa, red y batería, producción de hoy y estado del inversor."
+      },
+      "icon": "sun"
     }
   ]
 }

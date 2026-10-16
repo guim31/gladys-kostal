@@ -30,6 +30,20 @@ Gladys before reporting a problem.
 
 In scope: the code of this repository and the Docker image it publishes.
 
+What the integration handles:
+
+- **Secrets**: the plant owner password of the inverter lives in the Gladys
+  configuration only. It never travels in clear (the login is a SCRAM-SHA-256
+  handshake) and is never written to the logs nor to `/data`. The session id
+  the inverter gives lives in memory only, and the integration logs out when it
+  stops.
+- **`/data`**: one JSON file with the inventory of the inverter (serial number,
+  model, firmware versions, the measurements available). No secret.
+- **Network**: the integration only talks to the address configured, over
+  HTTP on the local network (HTTPS when typed, with the inverter's self-signed
+  certificate accepted). It writes to the inverter only through the two battery
+  scene actions, which are off by default.
+
 Out of scope: Gladys Assistant itself (see its
 [security policy](https://github.com/GladysAssistant/Gladys/security/policy)),
-and the third-party services and devices the integration talks to.
+the inverter and its firmware, and the Kostal cloud services.

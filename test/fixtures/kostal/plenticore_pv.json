@@ -1,0 +1,502 @@
+{
+  "source": "Reconstructed from the process data and settings ids the Home Assistant kostal_plenticore integration and pykoplenti (Apache 2.0) read, their test fixtures (settings metadata, version, me, event) and their documentation. Values are plausible, not recorded on a real inverter. Serial numbers and host names are invented.",
+  "description": "PLENTICORE plus 5.5 without battery, 3 PV strings (Battery:Type 0, the battery module is listed anyway), host name setting 'Network:Hostname'.",
+  "version": {
+    "sw_version": "01.16.05025",
+    "name": "PUCK RESTful API",
+    "api_version": "0.2.0",
+    "hostname": "plenticore"
+  },
+  "settings": [
+    {
+      "moduleid": "devices:local",
+      "settings": [
+        {
+          "min": "5",
+          "max": "100",
+          "default": null,
+          "access": "readwrite",
+          "unit": "%",
+          "id": "Battery:MinSoc",
+          "type": "byte"
+        },
+        {
+          "min": "50",
+          "max": "38000",
+          "default": null,
+          "access": "readwrite",
+          "unit": "W",
+          "id": "Battery:MinHomeComsumption",
+          "type": "byte"
+        },
+        {
+          "min": "0",
+          "max": "1",
+          "default": null,
+          "access": "readwrite",
+          "unit": null,
+          "id": "Battery:SmartBatteryControl:Enable",
+          "type": "bool"
+        },
+        {
+          "min": "0",
+          "max": "1",
+          "default": null,
+          "access": "readwrite",
+          "unit": null,
+          "id": "Battery:TimeControl:Enable",
+          "type": "bool"
+        },
+        {
+          "min": "0",
+          "max": "65535",
+          "default": null,
+          "access": "readonly",
+          "unit": null,
+          "id": "Battery:Type",
+          "type": "uint32"
+        },
+        {
+          "min": "0",
+          "max": "32",
+          "default": null,
+          "access": "readonly",
+          "unit": null,
+          "id": "Branding:ProductName1",
+          "type": "string"
+        },
+        {
+          "min": "0",
+          "max": "32",
+          "default": null,
+          "access": "readonly",
+          "unit": null,
+          "id": "Branding:ProductName2",
+          "type": "string"
+        },
+        {
+          "min": "0",
+          "max": "10000",
+          "default": null,
+          "access": "readonly",
+          "unit": "W",
+          "id": "Inverter:ActivePowerLimitation",
+          "type": "byte"
+        },
+        {
+          "min": "0",
+          "max": "32",
+          "default": null,
+          "access": "readonly",
+          "unit": null,
+          "id": "Properties:SerialNo",
+          "type": "string"
+        },
+        {
+          "min": "0",
+          "max": "65535",
+          "default": null,
+          "access": "readonly",
+          "unit": null,
+          "id": "Properties:String0Features",
+          "type": "uint32"
+        },
+        {
+          "min": "0",
+          "max": "65535",
+          "default": null,
+          "access": "readonly",
+          "unit": null,
+          "id": "Properties:String1Features",
+          "type": "uint32"
+        },
+        {
+          "min": "0",
+          "max": "3",
+          "default": null,
+          "access": "readonly",
+          "unit": null,
+          "id": "Properties:StringCnt",
+          "type": "byte"
+        },
+        {
+          "min": "0",
+          "max": "16",
+          "default": null,
+          "access": "readonly",
+          "unit": null,
+          "id": "Properties:VersionIOC",
+          "type": "string"
+        },
+        {
+          "min": "0",
+          "max": "16",
+          "default": null,
+          "access": "readonly",
+          "unit": null,
+          "id": "Properties:VersionMC",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "moduleid": "scb:network",
+      "settings": [
+        {
+          "min": "1",
+          "max": "63",
+          "default": null,
+          "access": "readwrite",
+          "unit": null,
+          "id": "Network:Hostname",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "moduleid": "scb:time",
+      "settings": [
+        {
+          "min": "0",
+          "max": "1",
+          "default": null,
+          "access": "readwrite",
+          "unit": null,
+          "id": "NTPuse",
+          "type": "bool"
+        },
+        {
+          "min": "0",
+          "max": "64",
+          "default": null,
+          "access": "readwrite",
+          "unit": null,
+          "id": "Timezone",
+          "type": "string"
+        }
+      ]
+    }
+  ],
+  "settingValues": {
+    "devices:local": {
+      "Properties:StringCnt": "3",
+      "Properties:String0Features": "1",
+      "Properties:String1Features": "1",
+      "Properties:SerialNo": "99999ZZZ000456",
+      "Branding:ProductName1": "PLENTICORE",
+      "Branding:ProductName2": "plus 5.5",
+      "Properties:VersionIOC": "01.38",
+      "Properties:VersionMC": "01.40",
+      "Battery:MinSoc": "5",
+      "Battery:MinHomeComsumption": "200",
+      "Inverter:ActivePowerLimitation": "5500",
+      "Battery:Type": "0",
+      "Battery:SmartBatteryControl:Enable": "0",
+      "Battery:TimeControl:Enable": "0"
+    },
+    "scb:network": {
+      "Network:Hostname": "plenticore"
+    },
+    "scb:time": {
+      "NTPuse": "1",
+      "Timezone": "Europe/Paris"
+    }
+  },
+  "processdata": {
+    "day": {
+      "devices:local": {
+        "Bat2Grid_P": 0.0,
+        "Dc_P": 4210.5,
+        "DigitalIn": 0.0,
+        "EM_State": 0.0,
+        "Grid2Bat_P": 0.0,
+        "Grid_L1_I": 4.189,
+        "Grid_L1_P": -963.4,
+        "Grid_L2_I": 4.189,
+        "Grid_L2_P": -963.4,
+        "Grid_L3_I": 4.189,
+        "Grid_L3_P": -963.4,
+        "Grid_P": -2890.2,
+        "Grid_Q": 12.4,
+        "Grid_S": 2910.2,
+        "HomeBat_P": 0.0,
+        "HomeGrid_P": 0.0,
+        "HomeOwn_P": 0.0,
+        "HomePv_P": 1180.4,
+        "Home_P": 1180.4,
+        "Inverter:State": 6.0,
+        "Iso_R": 2147483.0,
+        "LimitEvuAbs": 10000.0,
+        "LimitEvuRel": 100.0,
+        "PV2Bat_P": 0.0,
+        "SinkMax_P": 10000.0,
+        "SourceMax_P": 10000.0,
+        "WorkTime": 3215412.0
+      },
+      "devices:local:ac": {
+        "CosPhi": 1.0,
+        "Frequency": 50.01,
+        "L1_I": 5.899,
+        "L1_P": 1356.9,
+        "L1_U": 231.2,
+        "L2_I": 5.899,
+        "L2_P": 1356.9,
+        "L2_U": 230.4,
+        "L3_I": 5.899,
+        "L3_P": 1356.9,
+        "L3_U": 232.0,
+        "P": 4070.6,
+        "Q": 0.0,
+        "ResidualCDc": 14.0,
+        "S": 4070.6
+      },
+      "devices:local:battery": {
+        "Cycles": 0.0,
+        "I": 0.0,
+        "P": 0.0,
+        "SoC": 0.0,
+        "U": 0.0
+      },
+      "devices:local:powermeter": {
+        "CosPhi": 0.98,
+        "Frequency": 50.01,
+        "I": 12.566,
+        "L1_P": -963.4,
+        "L2_P": -963.4,
+        "L3_P": -963.4,
+        "P": -2890.2,
+        "Q": 15.2,
+        "S": 2911.2
+      },
+      "devices:local:pv1": {
+        "I": 3.32,
+        "P": 1702.3,
+        "U": 512.0
+      },
+      "devices:local:pv2": {
+        "I": 2.99,
+        "P": 1488.0,
+        "U": 498.4
+      },
+      "devices:local:pv3": {
+        "I": 2.54,
+        "P": 1020.2,
+        "U": 401.7
+      },
+      "scb:event": {
+        "Event:ActiveErrorCnt": 0.0,
+        "Event:ActiveWarningCnt": 0.0
+      },
+      "scb:statistic:EnergyFlow": {
+        "Statistic:Autarky:Day": 52.4,
+        "Statistic:Autarky:Month": 52.4,
+        "Statistic:Autarky:Year": 52.4,
+        "Statistic:Autarky:Total": 52.4,
+        "Statistic:OwnConsumptionRate:Day": 28.9,
+        "Statistic:OwnConsumptionRate:Month": 28.9,
+        "Statistic:OwnConsumptionRate:Year": 28.9,
+        "Statistic:OwnConsumptionRate:Total": 28.9,
+        "Statistic:EnergyHome:Day": 4321.0,
+        "Statistic:EnergyHome:Month": 377777.8,
+        "Statistic:EnergyHome:Year": 3777778.0,
+        "Statistic:EnergyHome:Total": 18888889.8,
+        "Statistic:EnergyHomeBat:Day": 0.0,
+        "Statistic:EnergyHomeBat:Month": 0.0,
+        "Statistic:EnergyHomeBat:Year": 0.0,
+        "Statistic:EnergyHomeBat:Total": 0.0,
+        "Statistic:EnergyHomeGrid:Day": 6172.8,
+        "Statistic:EnergyHomeGrid:Month": 246913.6,
+        "Statistic:EnergyHomeGrid:Year": 2469135.8,
+        "Statistic:EnergyHomeGrid:Total": 12345678.9,
+        "Statistic:EnergyHomePv:Day": 3271.6,
+        "Statistic:EnergyHomePv:Month": 130864.2,
+        "Statistic:EnergyHomePv:Year": 1308642.2,
+        "Statistic:EnergyHomePv:Total": 6543210.9,
+        "Statistic:EnergyPv1:Day": 0.0,
+        "Statistic:EnergyPv1:Month": 0.0,
+        "Statistic:EnergyPv1:Year": 0.0,
+        "Statistic:EnergyPv1:Total": 0,
+        "Statistic:EnergyPv2:Day": 0.0,
+        "Statistic:EnergyPv2:Month": 0.0,
+        "Statistic:EnergyPv2:Year": 0.0,
+        "Statistic:EnergyPv2:Total": 0,
+        "Statistic:EnergyPv3:Day": 0.0,
+        "Statistic:EnergyPv3:Month": 0.0,
+        "Statistic:EnergyPv3:Year": 0.0,
+        "Statistic:EnergyPv3:Total": 0,
+        "Statistic:Yield:Day": 9876.5,
+        "Statistic:Yield:Month": 375308.6,
+        "Statistic:Yield:Year": 3753086.4,
+        "Statistic:Yield:Total": 18765432.1,
+        "Statistic:EnergyChargeGrid:Day": 0.0,
+        "Statistic:EnergyChargeGrid:Month": 0.0,
+        "Statistic:EnergyChargeGrid:Year": 0.0,
+        "Statistic:EnergyChargeGrid:Total": 0.0,
+        "Statistic:EnergyChargePv:Day": 0.0,
+        "Statistic:EnergyChargePv:Month": 0.0,
+        "Statistic:EnergyChargePv:Year": 0.0,
+        "Statistic:EnergyChargePv:Total": 0.0,
+        "Statistic:EnergyDischarge:Day": 0.0,
+        "Statistic:EnergyDischarge:Month": 0.0,
+        "Statistic:EnergyDischarge:Year": 0.0,
+        "Statistic:EnergyDischarge:Total": 0.0,
+        "Statistic:EnergyDischargeGrid:Day": 0.0,
+        "Statistic:EnergyDischargeGrid:Month": 0.0,
+        "Statistic:EnergyDischargeGrid:Year": 0.0,
+        "Statistic:EnergyDischargeGrid:Total": 0,
+        "Statistic:EnergyChargeInvIn:Day": 0.0,
+        "Statistic:EnergyChargeInvIn:Month": 0.0,
+        "Statistic:EnergyChargeInvIn:Year": 0.0,
+        "Statistic:EnergyChargeInvIn:Total": 0
+      }
+    },
+    "night": {
+      "devices:local": {
+        "Bat2Grid_P": 0.0,
+        "Dc_P": 0.0,
+        "DigitalIn": 0.0,
+        "EM_State": 0.0,
+        "Grid2Bat_P": 0.0,
+        "Grid_L1_I": 0.743,
+        "Grid_L1_P": 170.9,
+        "Grid_L2_I": 0.743,
+        "Grid_L2_P": 170.9,
+        "Grid_L3_I": 0.743,
+        "Grid_L3_P": 170.9,
+        "Grid_P": 512.7,
+        "Grid_Q": 12.4,
+        "Grid_S": 532.7,
+        "HomeBat_P": 0.0,
+        "HomeGrid_P": 512.7,
+        "HomeOwn_P": 0.0,
+        "HomePv_P": 0.0,
+        "Home_P": 512.7,
+        "Inverter:State": 10.0,
+        "Iso_R": 2147483.0,
+        "LimitEvuAbs": 10000.0,
+        "LimitEvuRel": 100.0,
+        "PV2Bat_P": 0.0,
+        "SinkMax_P": 10000.0,
+        "SourceMax_P": 10000.0,
+        "WorkTime": 3215412.0
+      },
+      "devices:local:ac": {
+        "CosPhi": 1.0,
+        "Frequency": 50.01,
+        "L1_I": 0.0,
+        "L1_P": 0.0,
+        "L1_U": 231.2,
+        "L2_I": 0.0,
+        "L2_P": 0.0,
+        "L2_U": 230.4,
+        "L3_I": 0.0,
+        "L3_P": 0.0,
+        "L3_U": 232.0,
+        "P": 0.0,
+        "Q": 0.0,
+        "ResidualCDc": 14.0,
+        "S": 0.0
+      },
+      "devices:local:battery": {
+        "Cycles": 0.0,
+        "I": 0.0,
+        "P": 0.0,
+        "SoC": 0.0,
+        "U": 0.0
+      },
+      "devices:local:powermeter": {
+        "CosPhi": 0.98,
+        "Frequency": 50.01,
+        "I": 2.229,
+        "L1_P": 170.9,
+        "L2_P": 170.9,
+        "L3_P": 170.9,
+        "P": 512.7,
+        "Q": 15.2,
+        "S": 533.7
+      },
+      "devices:local:pv1": {
+        "I": 0.0,
+        "P": 0.0,
+        "U": 0.0
+      },
+      "devices:local:pv2": {
+        "I": 0.0,
+        "P": 0.0,
+        "U": 0.0
+      },
+      "devices:local:pv3": {
+        "I": 0.0,
+        "P": 0.0,
+        "U": 0.0
+      },
+      "scb:event": {
+        "Event:ActiveErrorCnt": 0.0,
+        "Event:ActiveWarningCnt": 0.0
+      },
+      "scb:statistic:EnergyFlow": {
+        "Statistic:Autarky:Day": 41.0,
+        "Statistic:Autarky:Month": 41.0,
+        "Statistic:Autarky:Year": 41.0,
+        "Statistic:Autarky:Total": 41.0,
+        "Statistic:OwnConsumptionRate:Day": 36.2,
+        "Statistic:OwnConsumptionRate:Month": 36.2,
+        "Statistic:OwnConsumptionRate:Year": 36.2,
+        "Statistic:OwnConsumptionRate:Total": 36.2,
+        "Statistic:EnergyHome:Day": 7012.8,
+        "Statistic:EnergyHome:Month": 377837.4,
+        "Statistic:EnergyHome:Year": 3778374.2,
+        "Statistic:EnergyHome:Total": 18891870.8,
+        "Statistic:EnergyHomeBat:Day": 0.0,
+        "Statistic:EnergyHomeBat:Month": 0.0,
+        "Statistic:EnergyHomeBat:Year": 0.0,
+        "Statistic:EnergyHomeBat:Total": 0.0,
+        "Statistic:EnergyHomeGrid:Day": 6174.2,
+        "Statistic:EnergyHomeGrid:Month": 246967.4,
+        "Statistic:EnergyHomeGrid:Year": 2469674.1,
+        "Statistic:EnergyHomeGrid:Total": 12348370.7,
+        "Statistic:EnergyHomePv:Day": 3271.8,
+        "Statistic:EnergyHomePv:Month": 130870.0,
+        "Statistic:EnergyHomePv:Year": 1308700.0,
+        "Statistic:EnergyHomePv:Total": 6543500.1,
+        "Statistic:EnergyPv1:Day": 0.0,
+        "Statistic:EnergyPv1:Month": 0.0,
+        "Statistic:EnergyPv1:Year": 0.0,
+        "Statistic:EnergyPv1:Total": 0,
+        "Statistic:EnergyPv2:Day": 0.0,
+        "Statistic:EnergyPv2:Month": 0.0,
+        "Statistic:EnergyPv2:Year": 0.0,
+        "Statistic:EnergyPv2:Total": 0,
+        "Statistic:EnergyPv3:Day": 0.0,
+        "Statistic:EnergyPv3:Month": 0.0,
+        "Statistic:EnergyPv3:Year": 0.0,
+        "Statistic:EnergyPv3:Total": 0,
+        "Statistic:Yield:Day": 10102.3,
+        "Statistic:Yield:Month": 375313.2,
+        "Statistic:Yield:Year": 3753131.6,
+        "Statistic:Yield:Total": 18765657.9,
+        "Statistic:EnergyChargeGrid:Day": 0.0,
+        "Statistic:EnergyChargeGrid:Month": 0.0,
+        "Statistic:EnergyChargeGrid:Year": 0.0,
+        "Statistic:EnergyChargeGrid:Total": 0.0,
+        "Statistic:EnergyChargePv:Day": 0.0,
+        "Statistic:EnergyChargePv:Month": 0.0,
+        "Statistic:EnergyChargePv:Year": 0.0,
+        "Statistic:EnergyChargePv:Total": 0.0,
+        "Statistic:EnergyDischarge:Day": 0.0,
+        "Statistic:EnergyDischarge:Month": 0.0,
+        "Statistic:EnergyDischarge:Year": 0.0,
+        "Statistic:EnergyDischarge:Total": 0.0,
+        "Statistic:EnergyDischargeGrid:Day": 0.0,
+        "Statistic:EnergyDischargeGrid:Month": 0.0,
+        "Statistic:EnergyDischargeGrid:Year": 0.0,
+        "Statistic:EnergyDischargeGrid:Total": 0,
+        "Statistic:EnergyChargeInvIn:Day": 0.0,
+        "Statistic:EnergyChargeInvIn:Month": 0.0,
+        "Statistic:EnergyChargeInvIn:Year": 0.0,
+        "Statistic:EnergyChargeInvIn:Total": 0
+      }
+    }
+  },
+  "events": []
+}

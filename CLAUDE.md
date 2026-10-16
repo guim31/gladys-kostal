@@ -5,9 +5,11 @@ contributors.
 
 ## What this is
 
-A Gladys Assistant **external integration**: a Node.js service (Node 22+, ESM,
-no build step) that runs in its own sandboxed Docker container and talks to
-Gladys through
+A Gladys Assistant **external integration** for **Kostal PLENTICORE plus,
+PLENTICORE BI and PIKO IQ / MP** inverters, read on the local network through
+the inverter's REST API (`http://<inverter>/api/v1/`) with the plant owner
+password: a Node.js service (Node 22+, ESM, no build step) that runs in its
+own sandboxed Docker container and talks to Gladys through
 [`@gladysassistant/integration-sdk`](https://github.com/GladysAssistant/integration-sdk-js),
 its only runtime dependency. It started from the official JavaScript template.
 
@@ -17,11 +19,12 @@ its only runtime dependency. It started from the official JavaScript template.
 npm install
 npm test                                  # node --test, the built-in runner
 node --test test/devices.test.js          # one file
-node --test --test-name-pattern "plug"    # tests whose name matches
+node --test --test-name-pattern "alarm"   # tests whose name matches
 npm run lint                              # ESLint
 npm run format:check                      # Prettier, as the CI runs it
 npm run format                            # Prettier, fix in place
-npx github:GladysAssistant/integration-store .   # store admission checks
+npx github:GladysAssistant/integration-store --skip-image-check .   # store admission checks
+node scripts/probe.mjs <ip>               # read-only probe of a real inverter (KOSTAL_PASSWORD)
 ```
 
 The CI (`.github/workflows/ci.yml`) runs `format:check`, `lint` and `test` on
@@ -31,16 +34,26 @@ pushing.
 ## Architecture
 
 ```
-index.js                          SDK wiring only: handlers registered before connect()
-src/devices/index.js              registry of the device blueprints + dispatch helpers
-src/devices/<type>.js             one device type per file (buildDevice, onPoll, onSetValue...)
-src/scenes.js                     scene action handlers (manifest `scene_actions`)
-src/widgets.js                    dashboard widget handlers (manifest `widgets`)
+index.js                          SDK wiring only: createApp + connect()
+src/app.js                        handlers, refresh cycle (own timer), reachability, login back-off
+src/kostal/scram.js               login handshake: SCRAM-SHA-256 + AES-GCM session request
+src/kostal/client.js              REST client: one request at a time, session, 401 re-login, error kinds
+src/kostal/parse.js               pure parsers: inventory (what the inverter is), reading, events, settings
+src/kostal/service.js             one inverter: inventory (kept in /data), snapshot, events, battery settings
+src/devices/inverter.js           the Gladys device (features) and its states
+src/devices/helpers.js            feature builder, category/type couples, display bounds
+src/triggers.js                   scene triggers (inverter_alarm, battery_full, battery_empty)
+src/scenes.js                     scene actions (set_battery_min_soc, set_smart_battery_control)
+src/widgets.js                    the "energy_flow" widget content (pure builder)
+src/i18n.js                       every user-visible text, en / fr / de / es
 src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults) + normalization
-src/weather.js                    example driver (Open-Meteo)
-gladys-assistant-integration.json manifest: name, config_schema, actions, image...
-docs/en.md, docs/fr.md            user documentation, re-hosted by Gladys (mandatory)
+src/store.js, src/issues.js       JSON files under /data; repeated failures logged once
+scripts/probe.mjs                 read-only probe of a real inverter (run by the maintainer)
+gladys-assistant-integration.json manifest: name, config_schema, actions, triggers, widget...
+docs/{en,fr,de,es}.md             user documentation, re-hosted by Gladys, same sections
 test/                             node --test, against the SDK's fake Gladys (integration-sdk/testing)
+test/helpers/fakeKostal.js        fake inverter: the API + the SERVER side of the login handshake
+test/fixtures/kostal/             two inverters (with / without battery), day and night readings
 .github/scripts/release.mjs       release helpers (manifest bump, changelog), tested in test/
 ```
 
@@ -70,10 +83,88 @@ test/                             node --test, against the SDK's fake Gladys (in
   `type: "provider"`: 5.1.0). `test/manifest.test.js` ties the manifest to the
   code (defaults, action, scene and widget handlers): change both sides
   together.
-- **User-facing text** is bilingual (English and French): action messages,
-  manifest texts, and `docs/en.md` / `docs/fr.md`, kept in sync.
+- **User-facing text** exists in four languages (English, French, German with
+  "du", Spanish with "usted"): manifest texts, `src/i18n.js` (the only source
+  file allowed to hold texts), and `docs/{en,fr,de,es}.md`, kept in sync.
+  `test/i18n.test.js` enforces it.
 - **Style.** Prettier formats, ESLint catches mistakes. Comments explain why,
-  in English. Tests never touch the network.
+  in English. Tests never touch the network (the client and probe tests use
+  the fake inverter on the loopback interface).
+
+## Kostal: what the code relies on
+
+Read in pykoplenti (Apache 2.0), in the Home Assistant `kostal_plenticore`
+integration and its tests, and in pykoplenti's notes on the process data.
+**Never checked on a real inverter** (developed without the hardware):
+`scripts/probe.mjs` prints what to check.
+
+- **Login** (`src/kostal/scram.js`, port of pykoplenti `_login`): `auth/start`
+  `{ username: 'user', nonce }` → `{ nonce, transactionId, salt, rounds }`;
+  `auth/finish` `{ transactionId, proof }` → `{ token, signature }` (the
+  inverter's signature is checked); `auth/create_session` with the token
+  encrypted in AES-256-GCM by `HMAC(StoredKey, "Session Key" + AuthMessage +
+ClientKey)` → `{ sessionId }`, then header `authorization: Session <id>`.
+  Kostal's AuthMessage repeats the server nonce:
+  `n=user,r=<cnonce>,r=<snonce>,s=<salt>,i=<rounds>,c=biws,r=<snonce>`.
+  `user` = plant owner; `master` (installer) needs the master key + service
+  code: not supported.
+- **Status codes**: 400 authentication failed, 401 not authorized (session
+  expired: log in again once), 403 user locked, 404 module or id not found,
+  503 internal communication error. A write refused for permissions is
+  assumed to be 403 (not documented): the scene actions never treat it as a
+  login problem.
+- **Failed logins lock the account**: a refused password is not retried for
+  15 minutes (`AUTH_RETRY_MS`), or until the configuration is saved, or the
+  user presses "Test the connection".
+- **Requests**: `POST processdata` and `POST settings` take a list
+  `[{ moduleid, processdataids | settingids }]` (the multi-module form; the
+  single-module variants fail on newer models, pykoplenti 1.5). An id the
+  inverter does not list fails the whole request: only listed ids are asked
+  (`parseInventory` filters them). Setting values are strings.
+- **Identity**: `devices:local` `Properties:SerialNo` (the platform id of the
+  external ids: never change it), `Branding:ProductName1/2` (model),
+  `Properties:VersionIOC/MC`; host name `scb:network` `Hostname` or
+  `Network:Hostname` depending on the firmware. No serial → no device.
+- **Measurements** (units W, Wh, %): `devices:local` `Dc_P` (includes the
+  battery), `Grid_P` (**> 0 import, < 0 export**, assumed from the Kostal
+  Modbus documentation), `Home_P`, `Inverter:State` (codes 0-18, Home
+  Assistant helper); `devices:local:ac/P`; `devices:local:pvN/P` (a few tenths
+  of a watt below zero at night: clamped); `devices:local:battery` `P`
+  (**> 0 discharge, < 0 charge**, Modbus "charge (−) / discharge (+)"), `SoC`,
+  `Cycles`; `scb:event/Event:ActiveErrorCnt`; `scb:statistic:EnergyFlow`
+  `Statistic:<name>:Day|Month|Year|Total` in Wh.
+- **PV strings**: `Properties:StringCnt` bounds them; a PLENTICORE plus with a
+  battery lists `devices:local:pv3` (the battery input) anyway.
+- **Battery presence**: the battery module is listed even without a battery;
+  `Battery:Type` `"0"` means none.
+- **Grid export counter**: not given by the API; computed like pykoplenti's
+  virtual `Statistic:EnergyGrid:Total` = Yield − HomePv − HomeBat.
+- **Events**: `POST events/latest { language: 'fr-fr', max }` returns the
+  latest events (active or not) described in that language (`en-gb`,
+  `fr-fr`, `de-de`, `es-es`). Read only while `ActiveErrorCnt > 0`.
+- **Battery settings** (`devices:local`): `Battery:MinSoc` (5-100, steps of 5
+  in the Kostal UI and Home Assistant), `Battery:SmartBatteryControl:Enable`
+  and `Battery:TimeControl:Enable` ("1"/"0", one strategy at a time: enabling
+  smart control writes the time control to "0" first, as the Home Assistant
+  select does). Writable when the settings list says `access: "readwrite"`
+  for the logged-in role.
+- **Energy couples**: the only `energy-sensor/index` is
+  `Statistic:EnergyHomeGrid:Total` (house from the grid: what the supplier
+  bills; the core derives `_consumption` and `_cost` from every such index);
+  lifetime production = `energy-production-sensor/index` (no half-hourly
+  production for external integrations in 5.2.1); export =
+  `grid-sensor/output-index`; battery = `battery-storage/charge-index` /
+  `discharge-index`. `test/devices.test.js` pins that no other feature is a
+  consumption index.
+- **Grid power**: one signed `grid-sensor/power` feature (import +, export −),
+  because the core asks to map the form the device natively reports, never
+  both. House consumption = `energy-sensor/power` (not `home-output-sensor`,
+  which is the inverter's own output: used for `devices:local:ac/P`).
+- **Design choices**: one device per inverter; the battery settings are scene
+  actions, not device features (no dashboard toggle to tap by mistake), off by
+  default; no installer access; no mediated discovery (nothing announced in
+  mDNS / SSDP); autarky and self-consumption (%) only in the widget (no couple
+  for a ratio).
 
 ---
 
@@ -197,6 +288,11 @@ code de ce dépôt. Compléter ce fichier quand un nouveau piège est découvert
 - Les filtres de scène ne font qu'égalité et appartenance : un seuil reste le travail d'un capteur.
 - **Les clés de widgets, de déclencheurs et d'actions sont figées une fois publiées.**
 - `gladys_version` `>=5.1.0` dès qu'il y a widgets, déclencheurs ou actions de scène.
+- Le faux Gladys du SDK 0.15 renvoie les sorties d'une action de scène dans `data.outputs`
+  (`{ success, data: { outputs } }`) et le message d'une action de configuration dans
+  `data.message` : un test qui lit `data` directement échoue (relevé sur gladys-kostal).
+- `gladys.requestWidgetRefresh(key)` est **synchrone** (renvoie `undefined`) : un `.catch()` dessus lève
+  un `TypeError`. L'entourer d'un `try` (relevé sur gladys-fronius).
 
 ## Store
 
