@@ -1,6 +1,6 @@
 {
   "name": "gladys-kostal",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Gladys Assistant integration for Kostal Plenticore and PIKO IQ inverters, on the local network.",
   "type": "module",

@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-16
+
 ### Added
 
 - Kostal PLENTICORE plus, PLENTICORE BI and PIKO IQ / MP inverters, read on the
@@ -32,4 +34,5 @@ the notes of the version's GitHub Release.
 - A "Test the connection" button, and the documentation in English, French,
   German and Spanish.
 
-[Unreleased]: https://github.com/guim31/gladys-kostal/commits/main
+[Unreleased]: https://github.com/guim31/gladys-kostal/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/guim31/gladys-kostal/releases/tag/v1.0.1
