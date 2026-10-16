@@ -1,169 +1,290 @@
 // -----------------------------------------------------------------------------
-// Dashboard widgets (SDK v0.14+, Gladys 5.1+).
+// The "Kostal" dashboard widget: production, house, grid and battery, today's
+// production, a 24 h chart and a status list (grid direction, battery flow,
+// inverter state, alarms, autarky, battery settings).
 //
-// A widget puts the integration's own data on the Gladys dashboard without a
-// dedicated core widget. The manifest `widgets` field declares its identity
-// (key, label, icon, optional per-instance `settings`); at runtime the
-// integration returns a DECLARATIVE content — `text`, `value`, `gauge`,
-// `status`, `chart`, `card-list`, `image`, `button` — that the core renders
-// with its own theme, dark mode and translations. No HTML, no CSS.
+// A widget never costs a request to the inverter: the content is built from
+// the reading of the last cycle. Tiles and chart are bound to the published
+// features when the device exists in Gladys (the core then animates them live
+// from the states); otherwise the tiles carry the cached values.
 //
-// Each entry of WIDGETS is keyed by the widget `key` and exposes:
-//   - get(gladys, { settings, language, units, config }): the content,
-//     registered by index.js with `gladys.onWidgetGet(key, ...)`;
-//   - action(gladys, { actionKey, params, settings, config }) (optional): a
-//     tapped `button` carrying an `action`, registered with
-//     `gladys.onWidgetAction`.
-//
-// Check your contents in the tests with `validateWidgetContent` (exported by
-// the SDK, see test/widgets.test.js), or run with DEBUG=gladys-integration-sdk
-// to have the SDK log every violation of the vocabulary and the budget.
+// Budget of the core: 8 components at most, 6 tiles, 1 focal, 1 status. This
+// content uses at most 5 tiles + 1 chart + 1 status = 7.
 // -----------------------------------------------------------------------------
 
 import {
-  createLogger,
-  DEVICE_FEATURE_CATEGORIES,
-  DEVICE_TRANSPORTS,
+  WIDGET_CHART_INTERVALS,
+  WIDGET_CHART_TYPES,
   WIDGET_COLORS,
 } from '@gladysassistant/integration-sdk';
-import { identifyDevice } from './devices/index.js';
-import { weatherStation } from './devices/weatherStation.js';
-import { plug } from './devices/plug.js';
-import { light } from './devices/light.js';
+import {
+  WIDGET_MESSAGES,
+  WIDGET_TEXT,
+  formatNumber,
+  formatPercent,
+  inverterStateText,
+  localize,
+  pick,
+} from './i18n.js';
+import { FEATURES, inverterIds, latestAlarmText } from './devices/inverter.js';
 
-const logger = createLogger({ name: 'widgets' });
+export const WIDGET_KEY = 'energy_flow';
+export const WIDGET_TTL_SECONDS = 60;
 
-// Widget key, as declared in the manifest `widgets` field.
-export const DEMO_STATUS_WIDGET = 'demo_status';
+// Inverter:State codes worth a colour: feeding in (6) is the normal day, a
+// fault-like state is shown in orange.
+const PRODUCING_STATES = new Set([6]);
+const WARNING_STATES = new Set([7, 8, 13, 14, 16]);
 
-// Keys of the `button` actions the demo_status content declares.
-const DEMO_STATUS_ACTIONS = { IDENTIFY_LIGHT: 'identify_light' };
-
-// How the plug transport reads in the status list.
-const TRANSPORT_STATUS = {
-  [DEVICE_TRANSPORTS.LOCAL]: { value: { en: 'Local', fr: 'Locale' }, color: WIDGET_COLORS.SUCCESS },
-  [DEVICE_TRANSPORTS.CLOUD]: { value: { en: 'Cloud', fr: 'Cloud' }, color: WIDGET_COLORS.INFO },
-  [DEVICE_TRANSPORTS.UNREACHABLE]: {
-    value: { en: 'Unreachable', fr: 'Injoignable' },
-    color: WIDGET_COLORS.DANGER,
-  },
-};
-
-// A live tile references a feature by its external_id: read it from the
-// discovery payload itself, so the widget and the device never disagree.
-function featureExternalId(gladys, config, blueprint, category) {
-  const device = blueprint.buildDevice(gladys, config);
-  return device.features.find((feature) => feature.category === category).external_id;
+/** A sentence instead of data (not configured, nothing read yet). */
+export function messageContent(message) {
+  return {
+    ttl_seconds: WIDGET_TTL_SECONDS,
+    components: [{ type: 'text', variant: 'body', text: message }],
+  };
 }
 
-function plugConnectionStatus(gladys, config) {
-  const { transport, degraded } = plug.transport(gladys, config);
-  const { value, color } = TRANSPORT_STATUS[transport];
-  if (degraded) {
-    return {
-      value: { en: `${value.en} (degraded mode)`, fr: `${value.fr} (mode dégradé)` },
-      color: WIDGET_COLORS.WARNING,
-    };
-  }
-  return { value, color };
+export const notConfiguredContent = () => messageContent(WIDGET_MESSAGES.notConfigured);
+export const noDataContent = () => messageContent(WIDGET_MESSAGES.noData);
+
+/** kWh as a short text: one decimal under 1000 kWh, none above (tiles are narrow). */
+function energyText(kwhValue, language) {
+  return formatNumber(kwhValue, kwhValue >= 1000 ? 0 : 1, language);
 }
 
-export const WIDGETS = {
-  [DEMO_STATUS_WIDGET]: {
-    // `settings` holds the per-instance values of the declared `settings`
-    // (none here); `language` and `units` are those of the user viewing the
-    // dashboard, for the values you format yourself. Multi-language objects
-    // (`{ en, fr }`) are picked by the core, like everywhere else.
-    async get(gladys, { config }) {
-      logger.debug(`onWidgetGet <- ${DEMO_STATUS_WIDGET}`);
-      return {
-        // Reload policy: the computed parts below only change with the
-        // config, and index.js nudges the widget on every (re)connection and
-        // config update (see refreshWidgets) — the TTL is just a safety net.
-        ttl_seconds: 300,
-        components: [
-          // Device-bound tiles: LIVE, they follow the published states over
-          // the core's real-time path. No TTL, no nudge involved.
-          {
-            type: 'value',
-            label: { en: 'Temperature', fr: 'Température' },
-            icon: 'thermometer',
-            device_feature: featureExternalId(
-              gladys,
-              config,
-              weatherStation,
-              DEVICE_FEATURE_CATEGORIES.TEMPERATURE_SENSOR,
-            ),
-          },
-          {
-            type: 'value',
-            label: { en: 'Office plug', fr: 'Prise du bureau' },
-            icon: 'zap',
-            device_feature: featureExternalId(
-              gladys,
-              config,
-              plug,
-              DEVICE_FEATURE_CATEGORIES.ENERGY_SENSOR,
-            ),
-          },
-          // Computed rows: what the integration knows that no device feature
-          // carries. Served from the core cache until the TTL or a nudge.
-          {
-            type: 'status',
-            items: [
-              {
-                label: { en: 'Plug connection', fr: 'Connexion de la prise' },
-                icon: 'wifi',
-                ...plugConnectionStatus(gladys, config),
-              },
-              {
-                label: { en: 'Observed location', fr: 'Position observée' },
-                icon: 'map-pin',
-                value: `${config.latitude.toFixed(2)}, ${config.longitude.toFixed(2)}`,
-                color: WIDGET_COLORS.NEUTRAL,
-              },
-            ],
-          },
-          // `params` are declared HERE and sent back as-is: the handler never
-          // receives user input (a dashboard can hang on a public wall).
-          {
-            type: 'button',
-            label: { en: 'Identify the light', fr: 'Identifier la lampe' },
-            icon: 'eye',
-            style: 'secondary',
-            action: {
-              key: DEMO_STATUS_ACTIONS.IDENTIFY_LIGHT,
-              params: { device: light.deviceExternalId(gladys) },
-            },
-          },
-        ],
-      };
-    },
-
-    // Resolve an optional toast (string or multi-language object, ≤ 200
-    // characters). After a successful action the core drops the cached
-    // content and every open dashboard refetches it: no nudge needed.
-    async action(gladys, { actionKey, params, config }) {
-      logger.info(`onWidgetAction <- ${DEMO_STATUS_WIDGET}.${actionKey}`);
-      if (actionKey === DEMO_STATUS_ACTIONS.IDENTIFY_LIGHT) {
-        return identifyDevice(gladys, params.device, config);
-      }
-      // Throwing acks the action as failed: the message reaches the user.
-      throw new Error(`Unknown widget action: ${actionKey}`);
-    },
-  },
-};
+function clockText(ms, timeZone) {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(new Date(ms));
+}
 
 /**
- * Freshness nudge: ask the core to re-pull every widget NOW instead of
- * waiting for the content TTL. Call it when you KNOW a computed content
- * changed (here: the config, which drives the plug transport and the observed
- * location) — and after every (re)connection, since the nudges are
- * fire-and-forget: rate-limited core-side to 1 per 10 s per widget, dropped
- * silently while disconnected.
+ * A tile bound to a feature when Gladys has it, the cached value otherwise.
+ * @param {Set<string>} created the feature external ids Gladys knows
  */
-export function refreshWidgets(gladys) {
-  for (const key of Object.keys(WIDGETS)) {
-    gladys.requestWidgetRefresh(key);
+function tile(created, { label, icon, externalId, value, unit }) {
+  if (created.has(externalId)) {
+    return { type: 'value', label, icon, device_feature: externalId };
   }
+  if (value === null || value === undefined) {
+    return null;
+  }
+  return { type: 'value', label, icon, value, unit };
+}
+
+const watts = (value) => (value === null || value === undefined ? null : Math.round(value));
+
+/**
+ * @param {object} input
+ * @param {object} input.gladys only for the external ids
+ * @param {object} input.inventory
+ * @param {object} input.snapshot the last reading
+ * @param {Array} input.events the active events, newest first
+ * @param {object|null} input.batterySettings { minSoc, smartControl } when read
+ * @param {Set<string>} input.created feature external ids of the device in Gladys
+ * @param {object} input.config
+ * @param {string} [input.timeZone]
+ * @returns {object} the widget content
+ */
+export function buildFlowContent({
+  gladys,
+  inventory,
+  snapshot,
+  events,
+  batterySettings,
+  created,
+  config,
+  timeZone,
+}) {
+  const ids = inverterIds(gladys, inventory);
+  const id = (key) => ids.feature(key);
+  const F = FEATURES;
+
+  const tiles = [
+    tile(created, {
+      label: WIDGET_TEXT.solar,
+      icon: 'sun',
+      externalId: id(F.pvPower),
+      value: watts(snapshot.pvPower),
+      unit: 'W',
+    }),
+  ];
+  if (inventory.hasHome) {
+    tiles.push(
+      tile(created, {
+        label: WIDGET_TEXT.house,
+        icon: 'home',
+        externalId: id(F.homePower),
+        value: watts(Math.max(snapshot.homePower ?? 0, 0)),
+        unit: 'W',
+      }),
+    );
+  }
+  if (inventory.hasGrid) {
+    tiles.push(
+      tile(created, {
+        label: WIDGET_TEXT.grid,
+        icon: 'zap',
+        externalId: id(F.gridPower),
+        value: watts(snapshot.gridPower),
+        unit: 'W',
+      }),
+    );
+  }
+  if (inventory.hasBattery) {
+    tiles.push(
+      tile(created, {
+        label: WIDGET_TEXT.battery,
+        icon: 'battery',
+        externalId: id(F.batteryLevel),
+        value:
+          snapshot.battery?.soc === null || snapshot.battery?.soc === undefined
+            ? null
+            : Math.round(snapshot.battery.soc),
+        unit: '%',
+      }),
+    );
+  }
+  tiles.push(
+    tile(created, {
+      label: WIDGET_TEXT.today,
+      icon: 'sunrise',
+      externalId: id(F.productionToday),
+      value:
+        snapshot.yieldDay === null
+          ? null
+          : localize((language) => energyText(snapshot.yieldDay / 1000, language)),
+      unit: 'kWh',
+    }),
+  );
+  const components = tiles.filter(Boolean);
+
+  // The chart needs the history Gladys keeps: only for created features.
+  const charted = [id(F.pvPower), id(F.homePower)].filter((externalId) => created.has(externalId));
+  if (charted.length > 0) {
+    components.push({
+      type: 'chart',
+      title: WIDGET_TEXT.chartTitle,
+      device_features: charted,
+      interval: WIDGET_CHART_INTERVALS.LAST_DAY,
+      chart_type: WIDGET_CHART_TYPES.LINE,
+    });
+  }
+
+  components.push({
+    type: 'status',
+    items: statusItems({ inventory, snapshot, events, batterySettings, config, timeZone }),
+  });
+  return { ttl_seconds: WIDGET_TTL_SECONDS, components };
+}
+
+function flowText(power, positiveLabel, negativeLabel, zeroLabel) {
+  // Rounded first: an idle battery reads a few watts either way.
+  const rounded = Math.round(power / 10) * 10;
+  const label = rounded > 0 ? positiveLabel : rounded < 0 ? negativeLabel : zeroLabel;
+  return localize((language) =>
+    rounded === 0 ? pick(label, language) : `${pick(label, language)} ${Math.abs(rounded)} W`,
+  );
+}
+
+function statusItems({ inventory, snapshot, events, batterySettings, config, timeZone }) {
+  const items = [];
+  if (inventory.hasGrid && snapshot.gridPower !== null) {
+    items.push({
+      label: WIDGET_TEXT.gridFlow,
+      value: flowText(
+        snapshot.gridPower,
+        WIDGET_TEXT.importing,
+        WIDGET_TEXT.exporting,
+        WIDGET_TEXT.balanced,
+      ),
+      icon: snapshot.gridPower < 0 ? 'upload' : 'download',
+    });
+  }
+  if (
+    inventory.hasBattery &&
+    snapshot.battery?.power !== null &&
+    snapshot.battery?.power !== undefined
+  ) {
+    items.push({
+      label: WIDGET_TEXT.batteryFlow,
+      // The API counts a discharge positive.
+      value: flowText(
+        snapshot.battery.power,
+        WIDGET_TEXT.discharging,
+        WIDGET_TEXT.charging,
+        WIDGET_TEXT.idle,
+      ),
+      icon: 'battery-charging',
+    });
+  }
+  if (snapshot.inverterState !== null) {
+    const state = snapshot.inverterState;
+    items.push({
+      label: WIDGET_TEXT.inverter,
+      value: inverterStateText(state),
+      icon: 'cpu',
+      color: PRODUCING_STATES.has(state)
+        ? WIDGET_COLORS.SUCCESS
+        : WARNING_STATES.has(state)
+          ? WIDGET_COLORS.WARNING
+          : WIDGET_COLORS.NEUTRAL,
+    });
+  }
+  if (inventory.hasEvents && snapshot.activeErrors !== null) {
+    const active = snapshot.activeErrors > 0;
+    items.push({
+      label: WIDGET_TEXT.alarms,
+      value: localize((language) =>
+        latestAlarmText(snapshot.activeErrors, events, language).slice(0, 40),
+      ),
+      icon: active ? 'alert-triangle' : 'check-circle',
+      color: active ? WIDGET_COLORS.DANGER : WIDGET_COLORS.SUCCESS,
+    });
+  }
+  if (snapshot.autarkyDay !== null) {
+    items.push({
+      label: WIDGET_TEXT.autarky,
+      value: localize((language) => formatPercent(snapshot.autarkyDay, language)),
+      icon: 'shield',
+    });
+  }
+  if (snapshot.ownConsumptionDay !== null) {
+    items.push({
+      label: WIDGET_TEXT.ownConsumption,
+      value: localize((language) => formatPercent(snapshot.ownConsumptionDay, language)),
+      icon: 'refresh-cw',
+    });
+  }
+  if (snapshot.homeDay !== null) {
+    items.push({
+      label: WIDGET_TEXT.houseToday,
+      value: localize((language) => `${energyText(snapshot.homeDay / 1000, language)} kWh`),
+      icon: 'home',
+    });
+  }
+  if (config.allowSettings && batterySettings) {
+    if (batterySettings.minSoc !== null) {
+      items.push({
+        label: WIDGET_TEXT.minSoc,
+        value: localize((language) => formatPercent(batterySettings.minSoc, language)),
+        icon: 'battery',
+      });
+    }
+    if (batterySettings.smartControl !== null) {
+      items.push({
+        label: WIDGET_TEXT.smartControl,
+        value: batterySettings.smartControl ? WIDGET_TEXT.on : WIDGET_TEXT.off,
+        icon: batterySettings.smartControl ? 'check-circle' : 'circle',
+      });
+    }
+  }
+  // The last row says how fresh the rest is: kept whatever the count.
+  return [
+    ...items.slice(0, 9),
+    { label: WIDGET_TEXT.updated, value: clockText(snapshot.fetchedAt, timeZone), icon: 'clock' },
+  ];
 }
