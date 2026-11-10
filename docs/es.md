@@ -28,12 +28,13 @@ Esta integración no está afiliada a KOSTAL Solar Electric. Kostal, PLENTICORE 
 2. En la pestaña **Configuración**:
    - **Dirección IP**: la dirección del inversor, por ejemplo `192.0.2.20`. También sirve un nombre de host.
    - **Contraseña de propietario**: guardada solo en la configuración de Gladys, nunca escrita en los registros.
+   - **Inversor 2 / Inversor 3 (opcional)**: la dirección de otro inversor Kostal de la instalación (por ejemplo el de la batería) y su contraseña de propietario; deje la contraseña vacía si es la misma que la del primer inversor. Cada inversor pasa a ser su propio dispositivo en Gladys. Deje estos bloques vacíos si solo tiene un inversor.
    - **Intervalo de actualización**: 10, 15 (por defecto), 30 o 60 segundos. Cada actualización es una petición al inversor.
    - **Idioma de los textos de los dispositivos**: nombres del dispositivo y de sus funciones, estado del inversor, textos de las alarmas (francés por defecto). Los nombres se fijan al añadir el dispositivo.
    - **Batería llena a partir de / Batería vacía a partir de**: los niveles que activan los desencadenantes de escena de la batería.
    - **Permitir los ajustes de la batería**: desactivado por defecto, vea «Acciones de escena».
 3. Haga clic en **Probar conexión**: la integración inicia sesión e indica lo que ha encontrado (modelo, cadenas FV, batería, firmware, ajustes de la batería).
-4. Abra la pestaña **Descubrir** y añada el inversor. Sus estados llegan de inmediato.
+4. Abra la pestaña **Descubrir** y añada el inversor (cada uno de ellos si tiene varios). Sus estados llegan de inmediato.
 
 ## El dispositivo
 
@@ -64,6 +65,8 @@ Todas las funciones son de solo lectura: nada en el panel puede modificar el inv
 
 «Casa desde la red (total)» es un índice de energía: Gladys deriva de él un consumo por media hora y su coste, como para un contador, y lo vincula a su contador eléctrico principal si lo tiene. Es el único índice de consumo del dispositivo: la energía que usted mismo produce nunca se cuenta como comprada.
 
+Con varios inversores, cada dispositivo tiene su propio «Casa desde la red (total)». Si ambos inversores leen el mismo contador de energía, los dos índices cuentan la misma energía: conserve solo uno en el seguimiento de energía de Gladys, o el consumo se contará dos veces.
+
 Los contadores de producción («Producción total», «Exportación a la red (total)») y los de la batería se guardan con su historial y se muestran en los gráficos. Gladys 5.2 aún no convierte el índice de producción de una integración externa en producción por media hora: llegará con el núcleo.
 
 ## Widget del panel
@@ -76,11 +79,15 @@ Añada el widget **Kostal** a un panel. Muestra:
 
 El widget no cuesta ninguna petición al inversor: muestra la última lectura.
 
+Con varios inversores, elija el inversor en los ajustes del widget (vacío: el primero): su nombre aparece arriba, y puede añadir un widget por inversor.
+
 ## Desencadenantes de escena
 
 - **Alarma del inversor Kostal**: ha aparecido una nueva alarma en el inversor. Variables: el código de la alarma, su texto (en el idioma de la configuración) y su categoría. Un mismo código se activa como máximo una vez cada 10 minutos.
 - **Batería Kostal llena**: el nivel de carga ha alcanzado el valor «Batería llena a partir de». Solo se vuelve a activar tras bajar 5 puntos.
 - **Batería Kostal vacía**: el nivel de carga ha bajado al valor «Batería vacía a partir de». Solo se vuelve a activar tras subir 5 puntos.
+
+Cada desencadenante puede limitarse a un inversor (vacío: cualquiera).
 
 No se activa nada en la primera lectura tras un arranque: un reinicio nunca repite una alarma antigua.
 
@@ -92,6 +99,8 @@ Ambas acciones están **desactivadas por defecto**: active primero «Permitir lo
 
 - **Ajustar la reserva de la batería Kostal**: el estado de carga mínimo que conserva la batería, de 5 a 100 %, en pasos del 5 %. La escena recibe el valor aplicado.
 - **Control inteligente de la batería Kostal**: activa o desactiva el control inteligente de la batería de Kostal. Activarlo desactiva el control horario, como hace la propia interfaz del inversor.
+
+Con varios inversores, elija el inversor en la acción (vacío: el primer inversor con batería).
 
 Un valor erróneo cambia el uso de su batería: compruébelo después en la interfaz web del inversor.
 
@@ -118,13 +127,14 @@ Un valor erróneo cambia el uso de su batería: compruébelo después en la inte
 - **«El inversor ha bloqueado la cuenta de propietario»**: espere a que se desbloquee (su interfaz web se lo indica) y vuelva a guardar la configuración.
 - **Falta una función**: el inversor no lista la medida (sin batería, una sola cadena, un firmware más antiguo). Ejecute «Probar conexión» y, tras una actualización del firmware, «Actualizar» en la pestaña Descubrir.
 - **Los signos de la red o de la batería parecen invertidos**: indíquelo en el foro con su modelo y su firmware: solo se han comprobado con la documentación.
+- **Varios inversores**: el estado de la conexión nombra el inversor que falla («Inversor 2: …»), y «Probar conexión» responde para cada uno.
 - **Más detalles**: ponga la variable de entorno `LOG_LEVEL` de la integración en `debug`. Los registros nunca contienen la contraseña ni la sesión.
 
 ## Limitaciones
 
 - Desarrollada sin el hardware: los signos (red, batería), la lista exacta de medidas de cada modelo y los ajustes modificables proceden de la documentación y de la integración de Home Assistant, no de una prueba con un inversor real.
 - Solo acceso de propietario: los ajustes que exigen el código de servicio del instalador (y la clave maestra) no son compatibles.
-- Un solo inversor por instalación de la integración.
+- Hasta tres inversores por instalación de la integración, leídos uno tras otro en cada actualización.
 - El contador de exportación es calculado (producción menos el consumo de la casa cubierto por el inversor), como hace Home Assistant.
 - Sin producción por media hora en el seguimiento de energía mientras el núcleo de Gladys no la admita para las integraciones externas.
 - Los PIKO IQ / MP y PLENTICORE BI deberían responder como el PLENTICORE plus (misma plataforma); una medida ausente da simplemente una función ausente.

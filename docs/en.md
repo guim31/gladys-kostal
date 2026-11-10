@@ -28,12 +28,13 @@ This integration is not affiliated with KOSTAL Solar Electric. Kostal, PLENTICOR
 2. In the **Configuration** tab:
    - **IP address**: the address of the inverter, for example `192.0.2.20`. A host name works too.
    - **Plant owner password**: stored in the Gladys configuration only, never written to the logs.
+   - **Inverter 2 / Inverter 3 (optional)**: the address of another Kostal inverter of the plant (for example the one with the battery) and its plant owner password; leave the password empty if it is the same as the first inverter's. Each inverter becomes its own device in Gladys. Leave these blocks empty if you have only one inverter.
    - **Refresh interval**: 10, 15 (default), 30 or 60 seconds. Each refresh is one request to the inverter.
    - **Language of the device texts**: names of the device and its features, inverter state, alarm texts (French by default). The names are fixed when you add the device.
    - **Battery full at / Battery empty at**: the levels that fire the battery scene triggers.
    - **Allow battery settings**: off by default, see "Scene actions".
 3. Click **Test the connection**: the integration logs in and says what it found (model, PV strings, battery, firmware, battery settings).
-4. Open the **Discovery** tab and add the inverter. Its states arrive at once.
+4. Open the **Discovery** tab and add the inverter (each of them if you have several). Its states arrive at once.
 
 ## The device
 
@@ -64,6 +65,8 @@ All the features are read-only: nothing on the dashboard can change the inverter
 
 "House from the grid (total)" is an energy index: Gladys derives a 30-minute consumption and its cost from it, like for a meter, and attaches it to your main electric meter if you have one. It is the only consumption index of the device, so the energy you produce yourself is never counted as bought.
 
+With several inverters, each device has its own "House from the grid (total)". If both inverters read the same energy meter, both indexes count the same energy: keep only one of them in the Gladys energy tracking, or the consumption is counted twice.
+
 The production counters ("Total production", "Grid export (total)") and the battery counters are kept with their history and shown in the charts. Gladys 5.2 does not yet turn the production index of an external integration into a half-hourly production: that will come with the core.
 
 ## Dashboard widget
@@ -76,11 +79,15 @@ Add the **Kostal** widget to a dashboard. It shows:
 
 The widget costs no request to the inverter: it shows the last reading.
 
+With several inverters, choose the inverter in the settings of the widget (empty: the first one): its name is shown at the top, and you can add one widget per inverter.
+
 ## Scene triggers
 
 - **Kostal inverter alarm**: a new alarm appeared on the inverter. Variables: the alarm code, its text (in the language of the configuration) and its category. The same code fires at most once every 10 minutes.
 - **Kostal battery full**: the charge level reached the "Battery full at" level. It fires again only after the level went down 5 points.
 - **Kostal battery empty**: the charge level fell to the "Battery empty at" level. It fires again only after the level went up 5 points.
+
+Each trigger can be limited to one inverter (empty: any inverter).
 
 Nothing fires on the first reading after a start: a restart never replays an old alarm.
 
@@ -92,6 +99,8 @@ Both actions are **off by default**: enable "Allow battery settings" in the conf
 
 - **Set the Kostal battery reserve**: the minimum state of charge the battery keeps, from 5 to 100 %, in steps of 5 %. The scene receives the value applied.
 - **Kostal smart battery control**: switches Kostal's smart battery control on or off. Switching it on turns the time control off, as the inverter's own interface does.
+
+With several inverters, choose the inverter in the action (empty: the first inverter with a battery).
 
 A wrong value changes how your battery is used: check it in the inverter's web interface afterwards.
 
@@ -118,13 +127,14 @@ A wrong value changes how your battery is used: check it in the inverter's web i
 - **"The inverter locked the plant owner account"**: wait for it to unlock (its web interface tells you), then save the configuration again.
 - **A feature is missing**: the inverter does not list the measurement (no battery, a single string, an older firmware). Run "Test the connection", then "Update" in the Discovery tab after a firmware update.
 - **Grid or battery signs look reversed**: tell us on the forum with your model and firmware: this was checked on documentation only.
+- **Several inverters**: the connection status names the inverter that fails ("Inverter 2: …"), and "Test the connection" answers for each of them.
 - **More details**: set the `LOG_LEVEL` environment variable of the integration to `debug`. The logs never contain the password nor the session.
 
 ## Limits
 
 - Developed without the hardware: the signs (grid, battery), the exact list of measurements of each model and the writable settings come from the documentation and the Home Assistant integration, not from a test on a real inverter.
 - Plant owner access only: the settings that need the installer service code (and the master key) are not supported.
-- One inverter per installation of the integration.
+- Up to three inverters per installation of the integration, read one after the other at each refresh.
 - The grid export counter is computed (production minus the house consumption served by the inverter), as Home Assistant does.
 - No half-hourly production in the energy tracking until the Gladys core supports it for external integrations.
 - PIKO IQ / MP and PLENTICORE BI are expected to answer like the PLENTICORE plus (same platform); a missing measurement simply means a missing feature.

@@ -28,12 +28,13 @@ Cette intégration n'est pas affiliée à KOSTAL Solar Electric. Kostal, PLENTIC
 2. Dans l'onglet **Configuration** :
    - **Adresse IP** : l'adresse de l'onduleur, par exemple `192.0.2.20`. Un nom d'hôte convient aussi.
    - **Mot de passe propriétaire** : conservé dans la configuration de Gladys uniquement, jamais écrit dans les journaux.
+   - **Onduleur 2 / Onduleur 3 (facultatif)** : l'adresse d'un autre onduleur Kostal de l'installation (par exemple celui de la batterie) et son mot de passe propriétaire ; laissez le mot de passe vide s'il est le même que celui du premier onduleur. Chaque onduleur devient son propre appareil dans Gladys. Laissez ces blocs vides si vous n'avez qu'un onduleur.
    - **Intervalle de rafraîchissement** : 10, 15 (par défaut), 30 ou 60 secondes. Chaque rafraîchissement est une requête à l'onduleur.
    - **Langue des textes des appareils** : noms de l'appareil et de ses fonctionnalités, état de l'onduleur, textes des alarmes (français par défaut). Les noms sont figés à l'ajout de l'appareil.
    - **Batterie pleine à / Batterie vide à** : les niveaux qui déclenchent les déclencheurs de scène de la batterie.
    - **Autoriser les réglages de la batterie** : désactivé par défaut, voir « Actions de scène ».
 3. Cliquez sur **Tester la connexion** : l'intégration se connecte et indique ce qu'elle a trouvé (modèle, chaînes PV, batterie, firmware, réglages de la batterie).
-4. Ouvrez l'onglet **Découverte** et ajoutez l'onduleur. Ses états arrivent aussitôt.
+4. Ouvrez l'onglet **Découverte** et ajoutez l'onduleur (chacun d'eux si vous en avez plusieurs). Ses états arrivent aussitôt.
 
 ## L'appareil
 
@@ -64,6 +65,8 @@ Toutes les fonctionnalités sont en lecture seule : rien sur le tableau de bord 
 
 « Maison depuis le réseau (total) » est un index d'énergie : Gladys en dérive une consommation par demi-heure et son coût, comme pour un compteur, et le rattache à votre compteur électrique principal si vous en avez un. C'est le seul index de consommation de l'appareil : l'énergie que vous produisez vous-même n'est jamais comptée comme achetée.
 
+Avec plusieurs onduleurs, chaque appareil a son propre « Maison depuis le réseau (total) ». Si les deux onduleurs lisent le même compteur d'énergie, les deux index comptent la même énergie : n'en gardez qu'un dans le suivi d'énergie de Gladys, sinon la consommation est comptée deux fois.
+
 Les compteurs de production (« Production totale », « Injection dans le réseau (total) ») et ceux de la batterie sont conservés avec leur historique et visibles dans les graphiques. Gladys 5.2 ne transforme pas encore l'index de production d'une intégration externe en production par demi-heure : cela viendra avec le cœur.
 
 ## Widget du tableau de bord
@@ -76,11 +79,15 @@ Ajoutez le widget **Kostal** à un tableau de bord. Il affiche :
 
 Le widget ne coûte aucune requête à l'onduleur : il affiche la dernière lecture.
 
+Avec plusieurs onduleurs, choisissez l'onduleur dans les réglages du widget (vide : le premier) : son nom s'affiche en haut, et vous pouvez ajouter un widget par onduleur.
+
 ## Déclencheurs de scène
 
 - **Alarme de l'onduleur Kostal** : une nouvelle alarme est apparue sur l'onduleur. Variables : le code de l'alarme, son texte (dans la langue de la configuration) et sa catégorie. Un même code se déclenche au plus une fois toutes les 10 minutes.
 - **Batterie Kostal pleine** : le niveau de charge a atteint le seuil « Batterie pleine à ». Ne se redéclenche qu'après une baisse de 5 points.
 - **Batterie Kostal vide** : le niveau de charge est descendu au seuil « Batterie vide à ». Ne se redéclenche qu'après une hausse de 5 points.
+
+Chaque déclencheur peut se limiter à un onduleur (vide : n'importe lequel).
 
 Rien ne se déclenche à la première lecture après un démarrage : un redémarrage ne rejoue jamais une ancienne alarme.
 
@@ -92,6 +99,8 @@ Les deux actions sont **désactivées par défaut** : activez d'abord « Autoris
 
 - **Régler la réserve de la batterie Kostal** : le seuil de décharge minimal que garde la batterie, de 5 à 100 %, par pas de 5 %. La scène reçoit la valeur appliquée.
 - **Gestion intelligente de la batterie Kostal** : active ou coupe la gestion intelligente de la batterie de Kostal. L'activer coupe la commande horaire, comme le fait l'interface de l'onduleur.
+
+Avec plusieurs onduleurs, choisissez l'onduleur dans l'action (vide : le premier onduleur avec batterie).
 
 Une valeur erronée change l'usage de votre batterie : vérifiez-la ensuite dans l'interface web de l'onduleur.
 
@@ -118,13 +127,14 @@ Une valeur erronée change l'usage de votre batterie : vérifiez-la ensuite dans
 - **« L'onduleur a bloqué le compte propriétaire »** : attendez son déblocage (son interface web vous l'indique), puis enregistrez à nouveau la configuration.
 - **Une fonctionnalité manque** : l'onduleur ne liste pas la mesure (pas de batterie, une seule chaîne, un firmware plus ancien). Lancez « Tester la connexion », puis « Mettre à jour » dans l'onglet Découverte après une mise à jour du firmware.
 - **Les signes du réseau ou de la batterie semblent inversés** : signalez-le sur le forum avec votre modèle et votre firmware : ils n'ont été vérifiés que sur la documentation.
+- **Plusieurs onduleurs** : l'état de la connexion nomme l'onduleur en défaut (« Onduleur 2 : … »), et « Tester la connexion » répond pour chacun.
 - **Plus de détails** : passez la variable d'environnement `LOG_LEVEL` de l'intégration à `debug`. Les journaux ne contiennent jamais le mot de passe ni la session.
 
 ## Limites
 
 - Développée sans le matériel : les signes (réseau, batterie), la liste exacte des mesures de chaque modèle et les réglages modifiables viennent de la documentation et de l'intégration Home Assistant, pas d'un essai sur un vrai onduleur.
 - Accès propriétaire seulement : les réglages qui exigent le code de service de l'installateur (et la clé maître) ne sont pas pris en charge.
-- Un seul onduleur par installation de l'intégration.
+- Jusqu'à trois onduleurs par installation de l'intégration, lus l'un après l'autre à chaque rafraîchissement.
 - Le compteur d'injection est calculé (production moins la consommation de la maison fournie par l'onduleur), comme le fait Home Assistant.
 - Pas de production par demi-heure dans le suivi d'énergie tant que le cœur de Gladys ne la gère pas pour les intégrations externes.
 - Les PIKO IQ / MP et PLENTICORE BI devraient répondre comme le PLENTICORE plus (même plateforme) ; une mesure absente donne simplement une fonctionnalité absente.

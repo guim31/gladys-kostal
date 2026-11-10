@@ -28,12 +28,13 @@ Diese Integration ist nicht mit KOSTAL Solar Electric verbunden. Kostal, PLENTIC
 2. Im Tab **Konfiguration**:
    - **IP-Adresse**: die Adresse des Wechselrichters, zum Beispiel `192.0.2.20`. Ein Hostname geht auch.
    - **Anlagenbetreiber-Passwort**: nur in der Gladys-Konfiguration gespeichert, nie in die Protokolle geschrieben.
+   - **Wechselrichter 2 / Wechselrichter 3 (optional)**: die Adresse eines weiteren Kostal-Wechselrichters der Anlage (zum Beispiel der mit der Batterie) und sein Anlagenbetreiber-Passwort; lass das Passwort leer, wenn es dasselbe wie beim ersten Wechselrichter ist. Jeder Wechselrichter wird ein eigenes Gerät in Gladys. Lass diese Blöcke leer, wenn du nur einen Wechselrichter hast.
    - **Aktualisierungsintervall**: 10, 15 (Standard), 30 oder 60 Sekunden. Jede Aktualisierung ist eine Anfrage an den Wechselrichter.
    - **Sprache der Gerätetexte**: Namen des Geräts und seiner Funktionen, Status des Wechselrichters, Alarmtexte (standardmäßig Französisch). Die Namen werden beim Hinzufügen des Geräts festgelegt.
    - **Batterie voll ab / Batterie leer ab**: die Werte, die die Szenen-Auslöser der Batterie auslösen.
    - **Batterieeinstellungen erlauben**: standardmäßig aus, siehe „Szenen-Aktionen“.
 3. Klicke auf **Verbindung testen**: Die Integration meldet sich an und zeigt, was sie gefunden hat (Modell, PV-Strings, Batterie, Firmware, Batterieeinstellungen).
-4. Öffne den Tab **Entdecken** und füge den Wechselrichter hinzu. Seine Werte kommen sofort an.
+4. Öffne den Tab **Entdecken** und füge den Wechselrichter hinzu (jeden davon, wenn du mehrere hast). Seine Werte kommen sofort an.
 
 ## Das Gerät
 
@@ -64,6 +65,8 @@ Alle Funktionen sind nur lesbar: Nichts auf dem Dashboard kann den Wechselrichte
 
 „Haus aus dem Netz (gesamt)“ ist ein Energiezähler: Gladys leitet daraus einen Halbstundenverbrauch und dessen Kosten ab, wie bei einem Stromzähler, und hängt ihn an deinen Hauptstromzähler, falls du einen hast. Es ist der einzige Verbrauchszähler des Geräts: Selbst erzeugte Energie wird nie als gekauft gezählt.
 
+Mit mehreren Wechselrichtern hat jedes Gerät seinen eigenen Zähler „Haus aus dem Netz (gesamt)“. Lesen beide Wechselrichter denselben Energiezähler, zählen beide Indizes dieselbe Energie: Behalte nur einen davon in der Energieüberwachung von Gladys, sonst wird der Verbrauch doppelt gezählt.
+
 Die Produktionszähler („Gesamtproduktion“, „Einspeisung (gesamt)“) und die Batteriezähler werden mit ihrem Verlauf gespeichert und in den Diagrammen angezeigt. Gladys 5.2 wandelt den Produktionszähler einer externen Integration noch nicht in eine Halbstundenproduktion um: Das kommt mit dem Kern.
 
 ## Dashboard-Widget
@@ -76,11 +79,15 @@ Füge das Widget **Kostal** zu einem Dashboard hinzu. Es zeigt:
 
 Das Widget kostet keine Anfrage an den Wechselrichter: Es zeigt die letzte Messung.
 
+Mit mehreren Wechselrichtern wählst du den Wechselrichter in den Einstellungen des Widgets (leer: der erste): Sein Name steht oben, und du kannst ein Widget pro Wechselrichter hinzufügen.
+
 ## Szenen-Auslöser
 
 - **Alarm des Kostal-Wechselrichters**: Ein neuer Alarm ist am Wechselrichter aufgetreten. Variablen: der Alarmcode, sein Text (in der Sprache der Konfiguration) und seine Kategorie. Derselbe Code löst höchstens alle 10 Minuten einmal aus.
 - **Kostal-Batterie voll**: Der Ladestand hat den Wert „Batterie voll ab“ erreicht. Löst erst nach einem Rückgang um 5 Punkte erneut aus.
 - **Kostal-Batterie leer**: Der Ladestand ist auf den Wert „Batterie leer ab“ gefallen. Löst erst nach einem Anstieg um 5 Punkte erneut aus.
+
+Jeder Auslöser lässt sich auf einen Wechselrichter beschränken (leer: ein beliebiger).
 
 Bei der ersten Messung nach einem Start wird nichts ausgelöst: Ein Neustart spielt nie einen alten Alarm erneut ab.
 
@@ -92,6 +99,8 @@ Beide Aktionen sind **standardmäßig aus**: Aktiviere zuerst „Batterieeinstel
 
 - **Reserve der Kostal-Batterie einstellen**: der minimale Ladestand, den die Batterie hält, von 5 bis 100 %, in 5-%-Schritten. Die Szene erhält den angewendeten Wert.
 - **Intelligente Batteriesteuerung von Kostal**: schaltet die intelligente Batteriesteuerung von Kostal ein oder aus. Das Einschalten beendet die Zeitsteuerung, wie es die Oberfläche des Wechselrichters auch tut.
+
+Mit mehreren Wechselrichtern wählst du den Wechselrichter in der Aktion (leer: der erste Wechselrichter mit Batterie).
 
 Ein falscher Wert ändert die Nutzung deiner Batterie: Prüfe ihn danach in der Weboberfläche des Wechselrichters.
 
@@ -118,13 +127,14 @@ Ein falscher Wert ändert die Nutzung deiner Batterie: Prüfe ihn danach in der 
 - **„Der Wechselrichter hat das Anlagenbetreiber-Konto gesperrt“**: Warte, bis es entsperrt ist (die Weboberfläche zeigt es dir), und speichere die Konfiguration dann erneut.
 - **Eine Funktion fehlt**: Der Wechselrichter listet die Messung nicht (keine Batterie, nur ein String, eine ältere Firmware). Starte „Verbindung testen“ und nach einem Firmware-Update „Aktualisieren“ im Tab Entdecken.
 - **Die Vorzeichen von Netz oder Batterie wirken vertauscht**: Melde es im Forum mit deinem Modell und deiner Firmware: Die Vorzeichen wurden nur anhand der Dokumentation geprüft.
+- **Mehrere Wechselrichter**: Der Verbindungsstatus nennt den Wechselrichter mit dem Fehler („Wechselrichter 2: …“), und „Verbindung testen“ antwortet für jeden.
 - **Mehr Details**: Setze die Umgebungsvariable `LOG_LEVEL` der Integration auf `debug`. Die Protokolle enthalten nie das Passwort oder die Sitzung.
 
 ## Grenzen
 
 - Ohne die Hardware entwickelt: Die Vorzeichen (Netz, Batterie), die genaue Liste der Messwerte jedes Modells und die änderbaren Einstellungen stammen aus der Dokumentation und der Home-Assistant-Integration, nicht aus einem Test an einem echten Wechselrichter.
 - Nur Anlagenbetreiber-Zugang: Einstellungen, die den Servicecode des Installateurs (und den Master-Key) erfordern, werden nicht unterstützt.
-- Ein Wechselrichter pro Installation der Integration.
+- Bis zu drei Wechselrichter pro Installation der Integration, bei jeder Aktualisierung nacheinander gelesen.
 - Der Einspeisezähler ist berechnet (Produktion minus der vom Wechselrichter gedeckte Hausverbrauch), wie in Home Assistant.
 - Keine Halbstundenproduktion in der Energieüberwachung, solange der Gladys-Kern sie für externe Integrationen nicht unterstützt.
 - PIKO IQ / MP und PLENTICORE BI sollten wie der PLENTICORE plus antworten (gleiche Plattform); ein fehlender Messwert bedeutet einfach eine fehlende Funktion.

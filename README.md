@@ -18,7 +18,8 @@ PLENTICORE and PIKO are trademarks of their owners.
 
 ## What it does
 
-One Gladys device per inverter, with what the inverter actually measures:
+One Gladys device per inverter (up to three per installation), with what the
+inverter actually measures:
 
 - solar production, total and per PV string;
 - house consumption, the grid exchange (one signed value: import +, export −),
@@ -60,20 +61,22 @@ Spanish); Gladys shows it from the Configuration screen.
    `https://github.com/guim31/gladys-kostal` (or install it from the store
    once it is listed).
 2. In the **Configuration** tab, enter the address of the inverter and the
-   plant owner password, and save. **Test the connection** says what was
-   found.
-3. In the **Discovery** tab, add the inverter: it is refreshed only once
-   added.
-4. Add the **Kostal** widget to a dashboard, and use the triggers in your
-   scenes.
+   plant owner password, and save. A second or third inverter (for example
+   the one with the battery) goes in the optional **Inverter 2** /
+   **Inverter 3** blocks, with its own password (empty: the first one's).
+   **Test the connection** says what was found, for each inverter.
+3. In the **Discovery** tab, add the inverter (each of them): it is
+   refreshed only once added.
+4. Add the **Kostal** widget to a dashboard (one per inverter, chosen in its
+   settings), and use the triggers in your scenes.
 
 ## How it works
 
 - Login: SCRAM-SHA-256 then an AES-GCM encrypted session request, as the web
   interface does (`src/kostal/scram.js`); the password never travels. The
   session is kept; a request answered 401 logs in again once.
-- Refresh: one `POST /api/v1/processdata` every 10 to 60 seconds (15 by
-  default), all modules at once; only the ids the inverter lists are asked.
+- Refresh: one `POST /api/v1/processdata` per inverter every 10 to 60
+  seconds (15 by default), all modules at once; only the ids the inverter lists are asked.
   The alarm texts are read only while an alarm is active, the battery settings
   every 5 minutes and only when allowed, the inventory every 30 minutes.
 - The integration refreshes the device with its own timer; the poll of the
@@ -83,6 +86,10 @@ Spanish); Gladys shows it from the Configuration screen.
 - A refused password is not retried for 15 minutes (or until the
   configuration is saved): the inverter locks the account after several failed
   logins. The integration logs out when it stops.
+- Several inverters: each has its own session and its own password back-off,
+  and its device is keyed on its serial number (moving an inverter to another
+  slot of the configuration keeps its device). The first slot keeps the 1.0
+  keys (`host`, `password`): an existing installation runs on unchanged.
 - The inventory (serial number, model, the measurements available) is kept in
   `/data`, so the device is published again after a restart even if the
   inverter does not answer. No secret is written there.
@@ -93,8 +100,12 @@ Spanish); Gladys shows it from the Configuration screen.
   of each model and the writable settings are taken from the documentation and
   the Home Assistant integration.
 - Plant owner access only: no installer (master key + service code) settings.
-- One inverter per installation of the integration; no mediated discovery
-  (Kostal inverters announce nothing in mDNS or SSDP that Gladys relays).
+- Up to three inverters per installation of the integration, read one after
+  the other; no mediated discovery (Kostal inverters announce nothing in mDNS
+  or SSDP that Gladys relays).
+- With several inverters reading the same energy meter, each device has its
+  own "house from the grid" index: keep only one in the Gladys energy
+  tracking, or the consumption is counted twice.
 - The grid export counter is computed (yield minus the house consumption served
   by the inverter), like pykoplenti's virtual value.
 - The Gladys 5.2 core does not derive a half-hourly production from the
@@ -138,7 +149,8 @@ Project layout:
 
 ```
 index.js                SDK wiring
-src/app.js              handlers, refresh cycle, reachability, login back-off, widget, action
+src/app.js              handlers, refresh cycle over the inverters, status, widget, action
+src/unit.js             one inverter: session, reachability, login back-off, triggers
 src/kostal/             REST client, login handshake, parsers, service (inventory + readings)
 src/devices/            the inverter device and its states
 src/triggers.js         scene triggers

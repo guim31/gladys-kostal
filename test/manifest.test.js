@@ -255,7 +255,7 @@ test('the scene declarations match the data the code sends and returns', () => {
     ]),
   );
   assert.deepEqual(actions, {
-    set_battery_min_soc: { fields: ['level'], outputs: ['min_soc'] },
-    set_smart_battery_control: { fields: ['enabled'], outputs: ['enabled'] },
+    set_battery_min_soc: { fields: ['device', 'level'], outputs: ['min_soc'] },
+    set_smart_battery_control: { fields: ['device', 'enabled'], outputs: ['enabled'] },
   });
 });

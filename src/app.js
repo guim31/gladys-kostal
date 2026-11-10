@@ -3,57 +3,55 @@
 // its fake Gladys in the tests).
 //
 // Life of the integration:
-// 1. On connection and on every configuration change: the device kept in
-//    /data is published at once, then the inverter is logged in and read
-//    whole (discovery) and its device published again.
+// 1. On connection and on every configuration change: the devices kept in
+//    /data are published at once, then each inverter is logged in and read
+//    whole (discovery) and the devices published again.
 // 2. Every refresh interval (10 to 60 s), the container's own timer runs a
-//    cycle: one request for the measurements (plus the alarm texts while an
-//    alarm is active, and the battery settings every 5 minutes when allowed),
-//    then the states that changed, the scene events, the widget nudge.
-//    Gladys's onPoll is only a fallback, skipped when the timer just ran
-//    (GladysAssistant/Gladys#3198: a device created without should_poll is
-//    never polled by Gladys 5.2).
+//    cycle over every inverter, one after the other: one request for the
+//    measurements (plus the alarm texts while an alarm is active, and the
+//    battery settings every 5 minutes when allowed), then the states that
+//    changed, the scene events, the widget nudge. Gladys's onPoll is only a
+//    fallback, skipped when the timer just ran (GladysAssistant/Gladys#3198: a
+//    device created without should_poll is never polled by Gladys 5.2).
 // 3. Only a device the user added is refreshed: without it, nothing is read
 //    (except for the widget, at most once per interval).
 // 4. A refused password is not retried for 15 minutes (or until the
 //    configuration is saved): the inverter locks the account after several
-//    failed logins.
+//    failed logins. Each inverter has its own back-off (src/unit.js).
+//
+// Up to three inverters (src/config.js), one Gladys device each, keyed on
+// the serial number. The connection status of the Configuration screen is
+// the integration's: connected when every inverter answers, otherwise the
+// problem of the first one that fails, named when there are several.
 //
 // Logs: info for the life cycle only (start, inverter found, lost and back,
 // one line per user action); a normal cycle writes debug lines only. The
-// password and the session id are never written.
+// passwords and the session ids are never written.
 // -----------------------------------------------------------------------------
 
 import { createLogger } from '@gladysassistant/integration-sdk';
 import { DEFAULT_CONFIG, isConfigured, normalizeConfig } from './config.js';
-import { createClient, httpRequest } from './kostal/client.js';
-import { createKostalService } from './kostal/service.js';
-import { buildInverter, deviceName, inverterIds, inverterStates } from './devices/inverter.js';
-import { createTriggerWatcher } from './triggers.js';
+import { httpRequest } from './kostal/client.js';
+import { buildInverter, deviceName } from './devices/inverter.js';
 import { createSceneActions } from './scenes.js';
 import { createIssueLog } from './issues.js';
-import { MESSAGES } from './i18n.js';
+import { MESSAGES, aboutInverter, localize, pick } from './i18n.js';
+import { createInverterUnit } from './unit.js';
 import { WIDGET_KEY, buildFlowContent, noDataContent, notConfiguredContent } from './widgets.js';
+
+export {
+  AUTH_RETRY_MS,
+  EVENTS_REFRESH_MS,
+  HEARTBEAT_MS,
+  REDISCOVERY_MS,
+  SETTINGS_REFRESH_MS,
+} from './unit.js';
 
 export const ACTIONS = { testConnection: 'test_connection' };
 export const WIDGETS = [WIDGET_KEY];
 
-// A value that does not change is published again after this delay, so
-// Gladys never shows "no recent value" (it does past 48 hours).
-export const HEARTBEAT_MS = 6 * 60 * 60 * 1000;
-// The inventory is read again this often (a battery installed, a firmware
-// update): four light requests.
-export const REDISCOVERY_MS = 30 * 60 * 1000;
-// A refused password is tried again after this delay only.
-export const AUTH_RETRY_MS = 15 * 60 * 1000;
-// The battery settings are read again this often (when allowed).
-export const SETTINGS_REFRESH_MS = 5 * 60 * 1000;
-// The alarm texts are read again this often while an alarm stays active.
-export const EVENTS_REFRESH_MS = 5 * 60 * 1000;
 // The widget content follows the states: one nudge a minute at most.
 const WIDGET_NUDGE_MS = 60 * 1000;
-
-const AUTH_KINDS = new Set(['auth', 'locked']);
 
 /**
  * @param {object} options
@@ -75,139 +73,83 @@ export function createApp({
   timeZone = process.env.TZ || undefined,
 }) {
   const issues = createIssueLog(logger);
-  const triggers = createTriggerWatcher({ gladys, logger, now });
 
   let config = normalizeConfig(DEFAULT_CONFIG);
-  let client = null;
-  let service = null;
+  /** @type {Map<number, ReturnType<typeof createInverterUnit>>} by slot, in slot order */
+  let units = new Map();
   let timer = null;
   let stopped = false;
   let running = null; // the cycle in progress
-  let lastCycleAt = -Infinity;
-  let discoveredAt = -Infinity;
   let lastNudgeAt = -Infinity;
-  let eventsReadAt = -Infinity;
-  let eventsCount = 0;
-  let reachable = null; // null: not known yet
-  let authBlockedUntil = -Infinity;
+  let publishError = null; // why Gladys refused the devices, while it does
+  let lastStatus = null; // the connection status last sent
 
-  // --- Helpers -----------------------------------------------------------------
+  const unitList = () => [...units.values()];
+  const unitOf = (externalId) =>
+    externalId ? (unitList().find((unit) => unit.externalId === externalId) ?? null) : null;
+  const several = () => config.inverters.length + config.invalidSlots.length > 1;
+  // With several inverters, a message says which one it is about.
+  const about = (slot, message) => (several() ? aboutInverter(slot, message) : message);
 
-  /** The device (if the user added it) and its feature ids. */
-  function createdOnGladys() {
-    const features = new Set();
-    const inventory = service?.inventory;
-    if (!inventory) {
-      return { device: null, features };
+  // --- Connection status --------------------------------------------------------
+
+  function currentStatus() {
+    if (!isConfigured(config)) {
+      const invalid = config.invalidSlots.length > 0;
+      return { connected: false, message: invalid ? MESSAGES.invalidHost : MESSAGES.notConfigured };
     }
-    const externalId = inverterIds(gladys, inventory).device;
-    const device = (gladys.devices ?? []).find((entry) => entry.external_id === externalId) ?? null;
-    for (const feature of device?.features ?? []) {
-      features.add(feature.external_id);
+    if (publishError) {
+      return { connected: false, message: MESSAGES.publishFailed(publishError) };
     }
-    return { device, features };
+    const failing = unitList().find((unit) => unit.failure);
+    if (failing) {
+      return { connected: false, message: about(failing.slot, failing.failure) };
+    }
+    if (config.invalidSlots.length > 0) {
+      return { connected: false, message: about(config.invalidSlots[0], MESSAGES.invalidHost) };
+    }
+    if (unitList().every((unit) => unit.reachable === true)) {
+      return { connected: true };
+    }
+    return null; // an inverter not known yet: say nothing before it is
   }
 
-  async function setStatus(connected, message) {
-    await gladys.setConnectionStatus(connected, message).catch((err) => {
+  /** Send the connection status when it changed. */
+  async function refreshStatus() {
+    const status = currentStatus();
+    const key = JSON.stringify(status);
+    if (!status || key === lastStatus) {
+      return;
+    }
+    lastStatus = key;
+    await gladys.setConnectionStatus(status.connected, status.message).catch((err) => {
       logger.debug(`Connection status not sent (${err.message})`);
     });
   }
 
-  async function publishTransport(transport) {
-    const { device } = createdOnGladys();
-    if (!device) {
-      return;
-    }
-    await gladys
-      .publishTransports([{ external_id: device.external_id, transport }])
-      .catch((err) => logger.debug(`Transport badge not sent (${err.message})`));
-  }
+  // --- Devices and widget ---------------------------------------------------------
 
-  async function markReachable() {
-    issues.ok('auth', 'The inverter accepts the password again');
-    if (reachable === true) {
-      return;
-    }
-    reachable = true;
-    issues.ok('kostal', 'The inverter answers again');
-    await setStatus(true);
-    await publishTransport('local');
-  }
-
-  /** Report a failed exchange with the inverter: the password, or the network. */
-  async function markFailed(err) {
-    if (AUTH_KINDS.has(err.kind)) {
-      // Not retried before the delay: the inverter locks the account.
-      authBlockedUntil = now() + AUTH_RETRY_MS;
-      client?.forget();
-      issues.fail(
-        'auth',
-        `The inverter refused the login (${err.message}): next try in 15 minutes`,
-      );
-      reachable = false;
-      await setStatus(false, err.kind === 'locked' ? MESSAGES.locked : MESSAGES.authFailed);
-      await publishTransport('unreachable');
-      return;
-    }
-    if (err.noSerial) {
-      issues.fail('kostal', `The inverter at ${config.baseUrl} gives no serial number`);
-      reachable = false;
-      await setStatus(false, MESSAGES.noSerial);
-      return;
-    }
-    issues.fail('kostal', `Inverter unreachable at ${config.baseUrl} (${err.message})`);
-    if (reachable === false) {
-      return;
-    }
-    reachable = false;
-    await setStatus(false, MESSAGES.unreachable(err.message));
-    await publishTransport('unreachable');
-  }
-
-  async function publishDevice() {
-    if (!service?.inventory) {
-      return;
-    }
-    try {
-      await gladys.publishDiscoveredDevices([buildInverter(gladys, service.inventory, config)]);
-      issues.ok('publish', 'Device accepted by Gladys again');
-    } catch (err) {
-      issues.fail('publish', `Gladys refused the device (${err.message})`);
-      await setStatus(false, MESSAGES.publishFailed(err.message));
-    }
-  }
-
-  function describe(inventory) {
-    return (
-      `${deviceName(inventory, 'en')} (firmware ${inventory.versions.software ?? '?'}): ` +
-      `${inventory.pvStrings.length} PV string(s), ${inventory.hasBattery ? 'battery' : 'no battery'}`
-    );
-  }
-
-  /**
-   * Log in if needed, read what the inverter is, publish its device.
-   * @throws the error (after reporting it)
-   */
-  async function discoverAndPublish() {
-    let result;
-    try {
-      result = await service.discover();
-    } catch (err) {
-      if (err.message === 'the inverter gives no serial number') {
-        err.noSerial = true;
+  /** The devices of every inverter known, as one list (it replaces the previous one). */
+  async function publishDevices() {
+    const devices = [];
+    for (const unit of unitList()) {
+      const { inventory } = unit.service;
+      if (inventory && !devices.some((device) => device.external_id === unit.externalId)) {
+        devices.push(buildInverter(gladys, inventory, config));
       }
-      await markFailed(err);
-      throw err;
     }
-    discoveredAt = now();
-    // Said once per connection, and when the inverter changes.
-    if (result.changed || reachable !== true) {
-      logger.info(`Kostal inverter at ${config.baseUrl}: ${describe(result.inventory)}`);
+    if (devices.length === 0) {
+      return;
     }
-    await markReachable();
-    await publishDevice();
-    return result;
+    try {
+      await gladys.publishDiscoveredDevices(devices);
+      issues.ok('publish', 'Devices accepted by Gladys again');
+      publishError = null;
+    } catch (err) {
+      issues.fail('publish', `Gladys refused the devices (${err.message})`);
+      publishError = err.message;
+    }
+    await refreshStatus();
   }
 
   function nudgeWidget(force = false) {
@@ -223,107 +165,36 @@ export function createApp({
     }
   }
 
-  /** Publish the states of the cached reading (no request to the inverter). */
-  async function publishSnapshot() {
-    const { features } = createdOnGladys();
-    if (!service?.snapshot || features.size === 0) {
-      return;
-    }
-    const states = inverterStates(gladys, service.inventory, {
-      reading: service.snapshot,
-      events: service.events,
-      config,
-    }).filter((state) => features.has(state.device_feature_external_id));
-    try {
-      const { count } = await gladys.publishChangedStates(states, { heartbeat: HEARTBEAT_MS });
-      issues.ok('states', 'States accepted by Gladys again');
-      logger.debug(`${count} state(s) published out of ${states.length}`);
-    } catch (err) {
-      issues.fail('states', `States not published (${err.message})`);
-    }
-  }
-
-  /** Alarm texts: read while an alarm is active, when the count moves or every 5 minutes. */
-  async function updateEvents(snapshot) {
-    const count = snapshot.activeErrors ?? 0;
-    if (!(count > 0)) {
-      service.clearEvents();
-      eventsCount = 0;
-      return;
-    }
-    if (count === eventsCount && now() - eventsReadAt < EVENTS_REFRESH_MS) {
-      return;
-    }
-    try {
-      await service.readEvents(config.language);
-      eventsReadAt = now();
-      eventsCount = count;
-      issues.ok('events', 'Inverter events read again');
-    } catch (err) {
-      issues.fail('events', `Inverter events not read (${err.message})`);
-    }
-  }
-
-  async function updateBatterySettings(force = false) {
-    if (!config.allowSettings || !service.inventory?.hasBattery) {
-      return;
-    }
-    const age = now() - (service.batterySettings?.readAt ?? -Infinity);
-    if (!force && age < SETTINGS_REFRESH_MS) {
-      return;
-    }
-    try {
-      await service.readBatterySettings();
-      issues.ok('settings', 'Battery settings read again');
-    } catch (err) {
-      issues.fail('settings', `Battery settings not read (${err.message})`);
-    }
-  }
-
-  /** Read the measurements (and what goes with them). */
-  async function read() {
-    const snapshot = await service.refresh();
-    lastCycleAt = now();
-    await markReachable();
-    await updateEvents(snapshot);
-    await updateBatterySettings();
-    return snapshot;
+  function createUnit(inverter) {
+    return createInverterUnit({
+      inverter,
+      gladys,
+      store,
+      transport,
+      logger,
+      now,
+      config: () => config,
+      publishDevices,
+      statusChanged: refreshStatus,
+    });
   }
 
   // --- The cycle -------------------------------------------------------------------
 
   async function runCycle() {
-    if (!isConfigured(config) || !service || gladys.connected === false) {
+    if (!isConfigured(config) || gladys.connected === false) {
       logger.debug('Cycle skipped (not configured or Gladys unreachable)');
       return;
     }
-    if (now() < authBlockedUntil) {
-      logger.debug('Cycle skipped (password refused, waiting before the next try)');
-      return;
-    }
-    if (!service.inventory || now() - discoveredAt >= REDISCOVERY_MS) {
-      try {
-        await discoverAndPublish();
-      } catch {
-        if (!service.inventory || now() < authBlockedUntil) {
-          return;
-        }
+    let read = false;
+    for (const unit of unitList()) {
+      if (await unit.cycle()) {
+        read = true;
       }
     }
-    if (!createdOnGladys().device) {
-      logger.debug('Kostal inverter not added to Gladys yet: nothing to refresh');
-      return;
+    if (read) {
+      nudgeWidget();
     }
-    let snapshot;
-    try {
-      snapshot = await read();
-    } catch (err) {
-      await markFailed(err);
-      return;
-    }
-    await publishSnapshot();
-    await triggers.evaluate(service.inventory, snapshot, service.events, config);
-    nudgeWidget();
   }
 
   /** One cycle at a time: a caller arriving during a cycle waits for it. */
@@ -354,68 +225,60 @@ export function createApp({
   // --- Configuration -------------------------------------------------------------
 
   async function applyConfig(raw) {
-    const next = normalizeConfig(raw ?? {});
-    const hostChanged = next.baseUrl !== config.baseUrl || !service;
-    const passwordChanged = next.password !== config.password;
-    config = next;
-    // Saving the configuration is the user's go for a new login attempt.
-    authBlockedUntil = -Infinity;
+    config = normalizeConfig(raw ?? {});
+    // Said again after a (re)connection or a save, even if unchanged.
+    lastStatus = null;
+    // An inverter whose address changed, or that was removed, is a new one.
+    const next = new Map();
+    let loaded = false;
+    for (const inverter of config.inverters) {
+      let unit = units.get(inverter.slot);
+      if (unit && unit.baseUrl === inverter.baseUrl) {
+        unit.setPassword(inverter.password);
+      } else {
+        unit = createUnit(inverter);
+        // Known from a previous run: its device is there even if the
+        // inverter does not answer right now.
+        loaded = (await unit.load()) || loaded;
+      }
+      // Saving the configuration is the user's go for a new login attempt.
+      unit.unblock();
+      next.set(inverter.slot, unit);
+    }
+    for (const [slot, unit] of units) {
+      if (next.get(slot) !== unit) {
+        await unit.logout();
+      }
+    }
+    units = next;
+    if (config.invalidSlots.length > 0) {
+      logger.info(`Invalid inverter address (inverter ${config.invalidSlots.join(', ')})`);
+    }
     if (!isConfigured(config)) {
       clearTimeout(timer);
-      await client?.logout().catch(() => {});
-      client = null;
-      service = null;
-      logger.info(
-        config.hostValid
-          ? 'Waiting for the address and the password of the inverter'
-          : 'Invalid inverter address',
-      );
-      await setStatus(false, config.hostValid ? MESSAGES.notConfigured : MESSAGES.invalidHost);
+      if (config.invalidSlots.length === 0) {
+        logger.info('Waiting for the address and the password of the inverter');
+      }
+      await refreshStatus();
       return;
     }
-    if (hostChanged) {
-      await client?.logout().catch(() => {});
-      client = createClient({
-        baseUrl: config.baseUrl,
-        password: () => config.password,
-        transport,
-      });
-      service = createKostalService({ client, store, now });
-      triggers.reset();
-      reachable = null;
-      discoveredAt = -Infinity;
-      if (await service.load()) {
-        // Known from a previous run: the device is there even if the
-        // inverter does not answer right now.
-        await publishDevice();
-      }
-    } else if (passwordChanged) {
-      client.forget();
+    if (loaded) {
+      await publishDevices();
     }
-    // The discovery reports its own failure; the timer tries again.
-    const discovered = await discoverAndPublish().then(
-      () => true,
-      () => false,
-    );
-    if (discovered && createdOnGladys().device) {
-      try {
-        await read();
-        await publishSnapshot();
-        await triggers.evaluate(service.inventory, service.snapshot, service.events, config);
-      } catch (err) {
-        await markFailed(err);
-      }
+    // Each discovery reports its own failure; the timer tries again.
+    for (const unit of unitList()) {
+      await unit.start();
     }
+    await refreshStatus();
     schedule();
   }
 
   const sceneActions = createSceneActions({
     config: () => config,
-    service: () => service,
-    ready: () => reachable === true,
-    afterWrite: async (what) => {
-      logger.info(`Scene action: ${what}`);
-      await updateBatterySettings(true);
+    units: unitList,
+    afterWrite: async (unit, what) => {
+      logger.info(`Scene action on the inverter at ${unit.baseUrl}: ${what}`);
+      await unit.updateBatterySettings(true);
       nudgeWidget(true);
     },
   });
@@ -425,19 +288,21 @@ export function createApp({
   const handlers = {
     async scanRequest() {
       logger.info('Discovery requested from Gladys');
-      if (!service || now() < authBlockedUntil) {
-        await publishDevice();
-        return;
+      for (const unit of unitList()) {
+        if (!unit.blocked) {
+          await unit.discover().catch(() => {});
+        }
       }
-      await discoverAndPublish().catch(() => publishDevice());
+      await publishDevices();
     },
 
     /** The core's onPoll: a fallback, skipped while the timer is on time. */
     async poll(device) {
-      if (!service || device.external_id !== createdOnGladys().device?.external_id) {
+      const unit = unitOf(device.external_id);
+      if (!unit) {
         return;
       }
-      const age = now() - Math.max(lastCycleAt, service.snapshot?.fetchedAt ?? -Infinity);
+      const age = now() - Math.max(unit.lastCycleAt, unit.service.snapshot?.fetchedAt ?? -Infinity);
       if (age < config.pollIntervalMs * 0.9) {
         logger.debug(`onPoll ${device.external_id}: read ${age} ms ago, skipped`);
         return;
@@ -445,13 +310,14 @@ export function createApp({
       await cycle();
     },
 
-    /** The device was just added (or updated): Gladys needs all its states now. */
+    /** A device was just added (or updated): Gladys needs all its states now. */
     async deviceChanged(device) {
-      if (!service || device.external_id !== createdOnGladys().device?.external_id) {
+      const unit = unitOf(device.external_id);
+      if (!unit) {
         return;
       }
-      if (service.snapshot) {
-        await publishSnapshot();
+      if (unit.service.snapshot) {
+        await unit.publishSnapshot();
       } else {
         await cycle();
       }
@@ -461,44 +327,43 @@ export function createApp({
     async testConnection() {
       logger.info('Action: test the connection');
       if (!isConfigured(config)) {
-        return config.hostValid ? MESSAGES.notConfigured : MESSAGES.invalidHost;
+        return config.invalidSlots.length > 0 ? MESSAGES.invalidHost : MESSAGES.notConfigured;
       }
-      // A user's explicit try is allowed even while the password is blocked.
-      authBlockedUntil = -Infinity;
-      try {
-        const { inventory } = await discoverAndPublish();
-        const { minSoc, smartControl } = inventory.settings;
-        const known = [minSoc, smartControl].filter(Boolean);
-        let settings = 'none';
-        if (!config.allowSettings) settings = 'disabled';
-        else if (known.some((meta) => meta.writable)) settings = 'writable';
-        else if (known.length > 0) settings = 'readOnly';
-        return MESSAGES.found({
-          model: deviceName(inventory, config.language),
-          firmware: inventory.versions.software,
-          strings: inventory.pvStrings.length,
-          battery: inventory.hasBattery,
-          settings,
-        });
-      } catch (err) {
-        if (err.kind === 'locked') return MESSAGES.locked;
-        if (err.kind === 'auth') return MESSAGES.authFailed;
-        if (err.noSerial) return MESSAGES.noSerial;
-        return MESSAGES.unreachable(err.message);
+      const answers = [];
+      for (const unit of unitList()) {
+        answers.push({ slot: unit.slot, message: await unit.testConnection() });
       }
+      await refreshStatus();
+      if (!several()) {
+        return answers[0].message;
+      }
+      for (const slot of config.invalidSlots) {
+        answers.push({ slot, message: MESSAGES.invalidHost });
+      }
+      answers.sort((a, b) => a.slot - b.slot);
+      const lines = answers.map(({ slot, message }) => aboutInverter(slot, message));
+      return localize((language) => lines.map((line) => pick(line, language)).join('\n'));
     },
 
-    async widgetGet() {
-      if (!isConfigured(config) || !service) {
+    /**
+     * The widget of one inverter: the one chosen in its settings, the first
+     * one otherwise (a widget placed with 1.0 has no setting).
+     */
+    async widgetGet({ settings } = {}) {
+      if (!isConfigured(config) || units.size === 0) {
         return notConfiguredContent();
       }
-      const { device, features } = createdOnGladys();
+      const unit = unitOf(settings?.device) ?? unitList()[0];
+      const { service } = unit;
+      const { device, features } = unit.createdOnGladys();
       // Without the device added, no cycle runs: read for the widget, at the
       // configured pace at most.
-      if (service.inventory && !device && now() >= authBlockedUntil) {
+      if (service.inventory && !device && !unit.blocked) {
         const age = now() - (service.snapshot?.fetchedAt ?? -Infinity);
         if (age >= config.pollIntervalMs) {
-          await read().catch((err) => logger.debug(`Widget: inverter not read (${err.message})`));
+          await unit
+            .read()
+            .catch((err) => logger.debug(`Widget: inverter not read (${err.message})`));
         }
       }
       if (!service.inventory || !service.snapshot) {
@@ -513,6 +378,9 @@ export function createApp({
         created: features,
         config,
         timeZone,
+        // With several inverters, the widget says which one it shows.
+        title:
+          units.size > 1 ? (device?.name ?? deviceName(service.inventory, config.language)) : null,
       });
     },
 
@@ -524,8 +392,13 @@ export function createApp({
     get config() {
       return config;
     },
+    /** The inverters, in slot order. */
+    get units() {
+      return unitList();
+    },
+    /** The service of the first inverter. */
     get service() {
-      return service;
+      return unitList()[0]?.service ?? null;
     },
     cycle,
 
@@ -536,7 +409,7 @@ export function createApp({
       gladys.onDeviceCreated((device) => handlers.deviceChanged(device));
       gladys.onDeviceUpdated((device) => handlers.deviceChanged(device));
       gladys.onAction(ACTIONS.testConnection, () => handlers.testConnection());
-      gladys.onWidgetGet(WIDGET_KEY, () => handlers.widgetGet());
+      gladys.onWidgetGet(WIDGET_KEY, (request) => handlers.widgetGet(request));
       for (const [key, handler] of Object.entries(sceneActions)) {
         gladys.onSceneAction(key, (fields) => handler(fields));
       }
@@ -558,8 +431,10 @@ export function createApp({
       clearTimeout(timer);
       timer = null;
       await running;
-      // Free the inverter's session (it only keeps a few).
-      await client?.logout().catch(() => {});
+      // Free the inverters' sessions (each keeps only a few).
+      for (const unit of unitList()) {
+        await unit.logout();
+      }
     },
   };
 }

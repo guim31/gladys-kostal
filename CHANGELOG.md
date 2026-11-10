@@ -10,6 +10,23 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+### Added
+
+- Several inverters: up to three Kostal inverters in one installation (for
+  example one with the battery, one without), in the optional "Inverter 2" and
+  "Inverter 3" blocks of the configuration, each with its own plant owner
+  password (empty: the first inverter's). Each inverter is its own Gladys
+  device, with its battery features only where there is a battery. An existing
+  configuration keeps working unchanged, with the same device.
+- The widget has an "Inverter" setting (empty: the first one) and shows the
+  name of the inverter when there are several; the scene actions have an
+  "Inverter" field (empty: the first inverter with a battery).
+
+### Changed
+
+- With several inverters, the connection status names the inverter that
+  fails, and "Test the connection" answers for each of them.
+
 ## [1.0.1] - 2026-10-16
 
 ### Added

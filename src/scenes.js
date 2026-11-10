@@ -10,6 +10,10 @@
 // change them by a mistaken tap, and every change is one info line in the
 // logs. A setting the inverter does not offer as writable to the plant owner
 // is refused before any request.
+//
+// Each action has an optional "Inverter" field: empty, it acts on the first
+// inverter with a battery (with a single inverter, the scenes made with 1.0
+// keep working unchanged).
 // -----------------------------------------------------------------------------
 
 import { SCENE_ERRORS, pick } from './i18n.js';
@@ -32,25 +36,39 @@ function fail(text, language) {
 /**
  * @param {object} options
  * @param {() => object} options.config the normalized configuration
- * @param {() => object|null} options.service the Kostal service, null when not configured
- * @param {() => boolean} options.ready the inverter answered and its inventory is known
- * @param {(what: string) => Promise<void>} options.afterWrite read the settings back, log the change
+ * @param {() => Array<object>} options.units the inverters (src/unit.js), in slot order
+ * @param {(unit: object, what: string) => Promise<void>} options.afterWrite read the settings back, log the change
  */
-export function createSceneActions({ config, service, ready, afterWrite }) {
-  function check(setting) {
+export function createSceneActions({ config, units, afterWrite }) {
+  /** The inverter a scene asks for: by its device, or the first with a battery. */
+  function target(fields, language) {
+    const list = units();
+    const wanted = typeof fields?.device === 'string' ? fields.device : '';
+    if (wanted === '') {
+      return list.find((unit) => unit.service.inventory?.hasBattery) ?? list[0] ?? null;
+    }
+    const unit = list.find((entry) => entry.externalId === wanted);
+    if (!unit && list.every((entry) => entry.externalId)) {
+      throw fail(SCENE_ERRORS.unknownInverter, language);
+    }
+    return unit ?? null;
+  }
+
+  function check(setting, fields) {
     const { language, allowSettings } = config();
     if (!allowSettings) {
       throw fail(SCENE_ERRORS.notAllowed, language);
     }
-    const kostal = service();
-    if (!kostal?.inventory || !ready()) {
+    const unit = target(fields, language);
+    const kostal = unit?.service;
+    if (!kostal?.inventory || unit.reachable !== true) {
       throw fail(SCENE_ERRORS.notReady, language);
     }
     const meta = kostal.inventory.settings[setting];
     if (!meta?.writable) {
       throw fail(SCENE_ERRORS.unavailable, language);
     }
-    return { kostal, meta, language };
+    return { unit, kostal, meta, language };
   }
 
   async function write(language, task) {
@@ -63,7 +81,7 @@ export function createSceneActions({ config, service, ready, afterWrite }) {
 
   return {
     async [SCENE_ACTIONS.setMinSoc](fields) {
-      const { kostal, meta, language } = check('minSoc');
+      const { unit, kostal, meta, language } = check('minSoc', fields);
       const asked = Number(fields?.level);
       if (!Number.isFinite(asked) || asked < meta.min || asked > meta.max) {
         throw fail(SCENE_ERRORS.outOfRange(meta.min, meta.max), language);
@@ -71,15 +89,15 @@ export function createSceneActions({ config, service, ready, afterWrite }) {
       const rounded = Math.round(asked / MIN_SOC_STEP) * MIN_SOC_STEP;
       const level = Math.min(Math.max(rounded, meta.min), meta.max);
       await write(language, () => kostal.writeMinSoc(level));
-      await afterWrite(`minimum state of charge set to ${level} %`);
+      await afterWrite(unit, `minimum state of charge set to ${level} %`);
       return { min_soc: level };
     },
 
     async [SCENE_ACTIONS.setSmartControl](fields) {
-      const { kostal, language } = check('smartControl');
+      const { unit, kostal, language } = check('smartControl', fields);
       const enabled = fields?.enabled === 'on' || fields?.enabled === true;
       await write(language, () => kostal.writeSmartControl(enabled));
-      await afterWrite(`smart battery control ${enabled ? 'on' : 'off'}`);
+      await afterWrite(unit, `smart battery control ${enabled ? 'on' : 'off'}`);
       return { enabled };
     },
   };
