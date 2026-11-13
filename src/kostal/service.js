@@ -24,13 +24,18 @@ import {
 
 export const INVENTORY_FILE = 'inventory';
 
+/** The file of each slot: the first keeps the name of 1.0 (no new discovery after the update). */
+export const inventoryFile = (slot = 1) =>
+  slot === 1 ? INVENTORY_FILE : `${INVENTORY_FILE}_${slot}`;
+
 /**
  * @param {object} options
  * @param {object} options.client createClient()
  * @param {{ read: Function, write: Function }} options.store
  * @param {() => number} options.now
+ * @param {string} [options.file] the name of its inventory file in /data
  */
-export function createKostalService({ client, store, now }) {
+export function createKostalService({ client, store, now, file = INVENTORY_FILE }) {
   let inventory = null;
   let snapshot = null;
   let events = [];
@@ -52,7 +57,7 @@ export function createKostalService({ client, store, now }) {
 
     /** The inventory of a previous run, if any. */
     async load() {
-      const saved = await store.read(INVENTORY_FILE);
+      const saved = await store.read(file);
       if (saved?.serial && saved.process) {
         inventory = saved;
         return true;
@@ -74,7 +79,7 @@ export function createKostalService({ client, store, now }) {
       const changed = JSON.stringify(next) !== JSON.stringify(inventory);
       inventory = next;
       if (changed) {
-        await store.write(INVENTORY_FILE, inventory);
+        await store.write(file, inventory);
       }
       return { inventory, changed };
     },

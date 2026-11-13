@@ -39,7 +39,7 @@ test('allowed: the reserve is written in steps of 5 %, read back, logged once', 
       .at('info')
       .map((line) => line.text)
       .slice(1),
-    ['Scene action: minimum state of charge set to 30 %'],
+    ['Scene action on the inverter at http://192.0.2.20: minimum state of charge set to 30 %'],
   );
   await world.app.stop();
 });

@@ -25,10 +25,10 @@
         "es": "Conectar su inversor Kostal"
       },
       "description": {
-        "en": "Enter the IP address of the inverter (shown in your router or on the inverter display) and the plant owner password you use to log in to its web interface. Gladys reads the inverter on your local network, without the Kostal cloud. Then open the Discovery tab.",
-        "fr": "Saisissez l'adresse IP de l'onduleur (visible dans votre box ou sur l'écran de l'onduleur) et le mot de passe propriétaire qui ouvre son interface web. Gladys lit l'onduleur sur votre réseau local, sans le cloud Kostal. Ouvrez ensuite l'onglet Découverte.",
-        "de": "Gib die IP-Adresse des Wechselrichters ein (in deinem Router oder auf dem Display des Wechselrichters zu sehen) und das Anlagenbetreiber-Passwort, mit dem du dich an seiner Weboberfläche anmeldest. Gladys liest den Wechselrichter im lokalen Netz, ohne die Kostal-Cloud. Öffne dann den Tab „Entdecken“.",
-        "es": "Introduzca la dirección IP del inversor (visible en su router o en la pantalla del inversor) y la contraseña de propietario con la que entra en su interfaz web. Gladys lee el inversor en su red local, sin la nube de Kostal. Después abra la pestaña Descubrir."
+        "en": "Enter the IP address of the inverter (shown in your router or on the inverter display) and the plant owner password you use to log in to its web interface. Gladys reads the inverter on your local network, without the Kostal cloud. Then open the Discovery tab. Up to three inverters: fill in the optional blocks below for the others.",
+        "fr": "Saisissez l'adresse IP de l'onduleur (visible dans votre box ou sur l'écran de l'onduleur) et le mot de passe propriétaire qui ouvre son interface web. Gladys lit l'onduleur sur votre réseau local, sans le cloud Kostal. Ouvrez ensuite l'onglet Découverte. Jusqu'à trois onduleurs : remplissez les blocs facultatifs plus bas pour les autres.",
+        "de": "Gib die IP-Adresse des Wechselrichters ein (in deinem Router oder auf dem Display des Wechselrichters zu sehen) und das Anlagenbetreiber-Passwort, mit dem du dich an seiner Weboberfläche anmeldest. Gladys liest den Wechselrichter im lokalen Netz, ohne die Kostal-Cloud. Öffne dann den Tab „Entdecken“. Bis zu drei Wechselrichter: Fülle für die weiteren die optionalen Blöcke unten aus.",
+        "es": "Introduzca la dirección IP del inversor (visible en su router o en la pantalla del inversor) y la contraseña de propietario con la que entra en su interfaz web. Gladys lee el inversor en su red local, sin la nube de Kostal. Después abra la pestaña Descubrir. Hasta tres inversores: rellene los bloques opcionales de abajo para los demás."
       }
     },
     {
@@ -70,6 +70,136 @@
         "es": "La contraseña de la cuenta de propietario de la interfaz web del inversor. No hace falta el código de servicio del instalador."
       },
       "required": true
+    },
+    {
+      "key": "section_2",
+      "type": "section",
+      "label": {
+        "en": "Inverter 2 (optional)",
+        "fr": "Onduleur 2 (facultatif)",
+        "de": "Wechselrichter 2 (optional)",
+        "es": "Inversor 2 (opcional)"
+      },
+      "description": {
+        "en": "Another Kostal inverter of the plant, for example the one with the battery. Each inverter becomes its own device in Gladys.",
+        "fr": "Un autre onduleur Kostal de l'installation, par exemple celui de la batterie. Chaque onduleur devient son propre appareil dans Gladys.",
+        "de": "Ein weiterer Kostal-Wechselrichter der Anlage, zum Beispiel der mit der Batterie. Jeder Wechselrichter wird ein eigenes Gerät in Gladys.",
+        "es": "Otro inversor Kostal de la instalación, por ejemplo el de la batería. Cada inversor pasa a ser su propio dispositivo en Gladys."
+      }
+    },
+    {
+      "key": "host_2",
+      "type": "string",
+      "label": {
+        "en": "IP address of inverter 2",
+        "fr": "Adresse IP de l'onduleur 2",
+        "de": "IP-Adresse von Wechselrichter 2",
+        "es": "Dirección IP del inversor 2"
+      },
+      "description": {
+        "en": "Leave empty if you have no other inverter.",
+        "fr": "Laissez vide si vous n'avez pas d'autre onduleur.",
+        "de": "Leer lassen, wenn du keinen weiteren Wechselrichter hast.",
+        "es": "Déjelo vacío si no tiene otro inversor."
+      },
+      "placeholder": {
+        "en": "e.g. 192.0.2.22",
+        "fr": "ex. 192.0.2.22",
+        "de": "z. B. 192.0.2.22",
+        "es": "p. ej. 192.0.2.22"
+      },
+      "required": false,
+      "default": ""
+    },
+    {
+      "key": "password_2",
+      "type": "secret",
+      "label": {
+        "en": "Password of inverter 2",
+        "fr": "Mot de passe de l'onduleur 2",
+        "de": "Passwort von Wechselrichter 2",
+        "es": "Contraseña del inversor 2"
+      },
+      "description": {
+        "en": "Its plant owner password. Leave empty if it is the same as the first inverter's.",
+        "fr": "Son mot de passe propriétaire. Laissez vide s'il est le même que celui du premier onduleur.",
+        "de": "Sein Anlagenbetreiber-Passwort. Leer lassen, wenn es dasselbe wie beim ersten Wechselrichter ist.",
+        "es": "Su contraseña de propietario. Déjela vacía si es la misma que la del primer inversor."
+      },
+      "required": false
+    },
+    {
+      "key": "section_3",
+      "type": "section",
+      "label": {
+        "en": "Inverter 3 (optional)",
+        "fr": "Onduleur 3 (facultatif)",
+        "de": "Wechselrichter 3 (optional)",
+        "es": "Inversor 3 (opcional)"
+      },
+      "description": {
+        "en": "Another Kostal inverter of the plant, for example the one with the battery. Each inverter becomes its own device in Gladys.",
+        "fr": "Un autre onduleur Kostal de l'installation, par exemple celui de la batterie. Chaque onduleur devient son propre appareil dans Gladys.",
+        "de": "Ein weiterer Kostal-Wechselrichter der Anlage, zum Beispiel der mit der Batterie. Jeder Wechselrichter wird ein eigenes Gerät in Gladys.",
+        "es": "Otro inversor Kostal de la instalación, por ejemplo el de la batería. Cada inversor pasa a ser su propio dispositivo en Gladys."
+      }
+    },
+    {
+      "key": "host_3",
+      "type": "string",
+      "label": {
+        "en": "IP address of inverter 3",
+        "fr": "Adresse IP de l'onduleur 3",
+        "de": "IP-Adresse von Wechselrichter 3",
+        "es": "Dirección IP del inversor 3"
+      },
+      "description": {
+        "en": "Leave empty if you have no other inverter.",
+        "fr": "Laissez vide si vous n'avez pas d'autre onduleur.",
+        "de": "Leer lassen, wenn du keinen weiteren Wechselrichter hast.",
+        "es": "Déjelo vacío si no tiene otro inversor."
+      },
+      "placeholder": {
+        "en": "e.g. 192.0.2.23",
+        "fr": "ex. 192.0.2.23",
+        "de": "z. B. 192.0.2.23",
+        "es": "p. ej. 192.0.2.23"
+      },
+      "required": false,
+      "default": ""
+    },
+    {
+      "key": "password_3",
+      "type": "secret",
+      "label": {
+        "en": "Password of inverter 3",
+        "fr": "Mot de passe de l'onduleur 3",
+        "de": "Passwort von Wechselrichter 3",
+        "es": "Contraseña del inversor 3"
+      },
+      "description": {
+        "en": "Its plant owner password. Leave empty if it is the same as the first inverter's.",
+        "fr": "Son mot de passe propriétaire. Laissez vide s'il est le même que celui du premier onduleur.",
+        "de": "Sein Anlagenbetreiber-Passwort. Leer lassen, wenn es dasselbe wie beim ersten Wechselrichter ist.",
+        "es": "Su contraseña de propietario. Déjela vacía si es la misma que la del primer inversor."
+      },
+      "required": false
+    },
+    {
+      "key": "section_options",
+      "type": "section",
+      "label": {
+        "en": "Options",
+        "fr": "Options",
+        "de": "Optionen",
+        "es": "Opciones"
+      },
+      "description": {
+        "en": "For every inverter.",
+        "fr": "Pour tous les onduleurs.",
+        "de": "Für alle Wechselrichter.",
+        "es": "Para todos los inversores."
+      }
     },
     {
       "key": "poll_interval",
@@ -454,6 +584,24 @@
       "timeout_seconds": 30,
       "fields": [
         {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Inverter",
+            "fr": "Onduleur",
+            "de": "Wechselrichter",
+            "es": "Inversor"
+          },
+          "description": {
+            "en": "Empty: the first inverter with a battery.",
+            "fr": "Vide : le premier onduleur avec batterie.",
+            "de": "Leer: der erste Wechselrichter mit Batterie.",
+            "es": "Vacío: el primer inversor con batería."
+          },
+          "required": false
+        },
+        {
           "key": "level",
           "type": "number",
           "label": {
@@ -496,6 +644,24 @@
       },
       "timeout_seconds": 30,
       "fields": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Inverter",
+            "fr": "Onduleur",
+            "de": "Wechselrichter",
+            "es": "Inversor"
+          },
+          "description": {
+            "en": "Empty: the first inverter with a battery.",
+            "fr": "Vide : le premier onduleur avec batterie.",
+            "de": "Leer: der erste Wechselrichter mit Batterie.",
+            "es": "Vacío: el primer inversor con batería."
+          },
+          "required": false
+        },
         {
           "key": "enabled",
           "type": "select",
@@ -557,7 +723,27 @@
         "de": "Solarproduktion, Haus, Netz und Batterie, Produktion heute und Wechselrichterstatus.",
         "es": "Producción solar, casa, red y batería, producción de hoy y estado del inversor."
       },
-      "icon": "sun"
+      "icon": "sun",
+      "settings": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Inverter",
+            "fr": "Onduleur",
+            "de": "Wechselrichter",
+            "es": "Inversor"
+          },
+          "description": {
+            "en": "Empty: the first inverter.",
+            "fr": "Vide : le premier onduleur.",
+            "de": "Leer: der erste Wechselrichter.",
+            "es": "Vacío: el primer inversor."
+          },
+          "required": false
+        }
+      ]
     }
   ]
 }

@@ -236,6 +236,13 @@ export const TEXTS = {
     de: 'Alarm aktiv',
     es: 'Alarma en curso',
   },
+  /** Which inverter of the configuration a message is about. */
+  inverterSlot: (slot) => ({
+    en: `Inverter ${slot}`,
+    fr: `Onduleur ${slot}`,
+    de: `Wechselrichter ${slot}`,
+    es: `Inversor ${slot}`,
+  }),
   alarmCode: (code) => ({
     en: `Alarm ${code}`,
     fr: `Alarme ${code}`,
@@ -245,6 +252,15 @@ export const TEXTS = {
 };
 
 // --- Configuration screen: connection status and the action ------------------------
+
+/** A message about one inverter of several: "Onduleur 2 : …". */
+export function aboutInverter(slot, message) {
+  const label = TEXTS.inverterSlot(slot);
+  return localize(
+    (language) =>
+      `${pick(label, language)}${language === 'fr' ? ' :' : ':'} ${pick(message, language)}`,
+  );
+}
 
 export const MESSAGES = {
   notConfigured: {
@@ -357,6 +373,12 @@ export const SCENE_ERRORS = {
     fr: 'Cet onduleur ne permet pas au propriétaire de modifier ce réglage.',
     de: 'Dieser Wechselrichter erlaubt dem Anlagenbetreiber nicht, diese Einstellung zu ändern.',
     es: 'Este inversor no permite al propietario cambiar este ajuste.',
+  },
+  unknownInverter: {
+    en: 'This inverter is not in the Kostal configuration any more.',
+    fr: "Cet onduleur n'est plus dans la configuration Kostal.",
+    de: 'Dieser Wechselrichter ist nicht mehr in der Kostal-Konfiguration.',
+    es: 'Este inversor ya no está en la configuración de Kostal.',
   },
   outOfRange: (min, max) => ({
     en: `The minimum state of charge must be between ${min} and ${max} %.`,

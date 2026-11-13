@@ -35,7 +35,8 @@ pushing.
 
 ```
 index.js                          SDK wiring only: createApp + connect()
-src/app.js                        handlers, refresh cycle (own timer), reachability, login back-off
+src/app.js                        handlers, refresh cycle (own timer) over the inverters, status
+src/unit.js                       one inverter (config slot): client, service, reachability, back-off, triggers
 src/kostal/scram.js               login handshake: SCRAM-SHA-256 + AES-GCM session request
 src/kostal/client.js              REST client: one request at a time, session, 401 re-login, error kinds
 src/kostal/parse.js               pure parsers: inventory (what the inverter is), reading, events, settings
@@ -160,7 +161,9 @@ ClientKey)` → `{ sessionId }`, then header `authorization: Session <id>`.
   because the core asks to map the form the device natively reports, never
   both. House consumption = `energy-sensor/power` (not `home-output-sensor`,
   which is the inverter's own output: used for `devices:local:ac/P`).
-- **Design choices**: one device per inverter; the battery settings are scene
+- **Design choices**: one device per inverter, up to three inverters (config
+  slots `host`/`password`, `host_2`/`password_2`, `host_3`/`password_3`: the
+  first keeps the 1.0 keys, never rename them); the battery settings are scene
   actions, not device features (no dashboard toggle to tap by mistake), off by
   default; no installer access; no mediated discovery (nothing announced in
   mDNS / SSDP); autarky and self-consumption (%) only in the widget (no couple

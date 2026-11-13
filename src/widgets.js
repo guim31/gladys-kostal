@@ -9,7 +9,8 @@
 // from the states); otherwise the tiles carry the cached values.
 //
 // Budget of the core: 8 components at most, 6 tiles, 1 focal, 1 status. This
-// content uses at most 5 tiles + 1 chart + 1 status = 7.
+// content uses at most 5 tiles + 1 chart + 1 status = 7, plus a heading
+// naming the inverter when there are several = 8.
 // -----------------------------------------------------------------------------
 
 import {
@@ -87,6 +88,7 @@ const watts = (value) => (value === null || value === undefined ? null : Math.ro
  * @param {Set<string>} input.created feature external ids of the device in Gladys
  * @param {object} input.config
  * @param {string} [input.timeZone]
+ * @param {string|null} [input.title] a heading naming the inverter (when there are several)
  * @returns {object} the widget content
  */
 export function buildFlowContent({
@@ -98,6 +100,7 @@ export function buildFlowContent({
   created,
   config,
   timeZone,
+  title = null,
 }) {
   const ids = inverterIds(gladys, inventory);
   const id = (key) => ids.feature(key);
@@ -160,7 +163,10 @@ export function buildFlowContent({
       unit: 'kWh',
     }),
   );
-  const components = tiles.filter(Boolean);
+  const components = [
+    ...(title ? [{ type: 'text', variant: 'heading', text: title.slice(0, 40) }] : []),
+    ...tiles.filter(Boolean),
+  ];
 
   // The chart needs the history Gladys keeps: only for created features.
   const charted = [id(F.pvPower), id(F.homePower)].filter((externalId) => created.has(externalId));

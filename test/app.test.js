@@ -156,7 +156,7 @@ test('lost and back: one warning, one info line, the status and the badge follow
     world.logs.at('info').map((line) => line.text),
     [
       'Kostal inverter at http://192.0.2.20: Kostal PLENTICORE plus 10 (firmware 01.26.09454): 2 PV string(s), battery',
-      'The inverter answers again',
+      'The inverter at http://192.0.2.20 answers again',
     ],
   );
   assert.equal(world.gladys.fake.connectionStatus.connected, true);
@@ -216,7 +216,9 @@ test('saving the right password logs in at once', async () => {
   assert.equal(world.gladys.fake.connectionStatus.connected, true);
   assert.equal(world.gladys.fake.discoveredDevices.length, 1);
   assert.ok(
-    world.logs.at('info').some((line) => line.text === 'The inverter accepts the password again'),
+    world.logs
+      .at('info')
+      .some((line) => line.text === 'The inverter at http://192.0.2.20 accepts the password again'),
   );
   await world.app.stop();
 });

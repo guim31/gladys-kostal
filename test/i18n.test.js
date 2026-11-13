@@ -23,6 +23,7 @@ import {
   TEXTS,
   WIDGET_MESSAGES,
   WIDGET_TEXT,
+  aboutInverter,
   inverterStateText,
 } from '../src/i18n.js';
 
@@ -106,6 +107,7 @@ test('device and feature names, text states: four languages, short', () => {
   checkText(TEXTS.noAlarm, 'TEXTS.noAlarm', 40);
   checkText(TEXTS.alarmPending, 'TEXTS.alarmPending', 40);
   checkText(TEXTS.alarmCode(65535), 'TEXTS.alarmCode', 40);
+  checkText(TEXTS.inverterSlot(3), 'TEXTS.inverterSlot', 40);
 });
 
 test('widget texts: tile and status labels within the SDK bounds', () => {
@@ -132,6 +134,7 @@ test('connection status, action and scene messages, built with values as long as
     'MESSAGES.publishFailed',
     300,
   );
+  checkText(aboutInverter(3, MESSAGES.authFailed), 'aboutInverter', 300);
   for (const settings of Object.keys(SETTINGS_STATUS)) {
     for (const battery of [true, false]) {
       checkText(
