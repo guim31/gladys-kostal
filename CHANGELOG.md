@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-17
+
 ### Added
 
 - Several inverters: up to three Kostal inverters in one installation (for
@@ -51,5 +53,6 @@ the notes of the version's GitHub Release.
 - A "Test the connection" button, and the documentation in English, French,
   German and Spanish.
 
-[Unreleased]: https://github.com/guim31/gladys-kostal/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/guim31/gladys-kostal/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/guim31/gladys-kostal/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/guim31/gladys-kostal/releases/tag/v1.0.1
